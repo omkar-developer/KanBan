@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Task } from "../../models/Task"
 import TaskEditor from "./TaskEditor"
+import CommentSection from "./CommentSection"
 import ConfirmDialog from "../ui/ConfirmDialog"
 
 interface TaskModalProps {
@@ -16,74 +17,86 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete }: T
 
   if (!isOpen || !task) return null
 
-  const handleOpenDeleteDialog = () => {
-    setShowDeleteDialog(true)
-  }
-
-  const handleDeleteConfirmed = async () => {
-    await onDelete(task.id!)
-    onClose()
-  }
-
   return (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)" }}
       onClick={onClose}
     >
       <div
-        className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 w-[480px] shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg rounded-2xl border border-white/[0.09] shadow-2xl flex flex-col max-h-[90vh]"
+        style={{ background: "#161616" }}
+        onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-white">Edit Task</h2>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06] flex-shrink-0">
+          <span
+            className="text-xs font-semibold text-zinc-600 uppercase tracking-widest"
+            style={{ fontFamily: "'DM Sans', sans-serif" }}
+          >
+            Edit Task
+          </span>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition"
           >
-            <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.75">
+              <path d="M2 2l10 10M12 2L2 12" strokeLinecap="round" />
             </svg>
           </button>
         </div>
 
-        {/* Editor */}
-        <TaskEditor
-          task={task}
-          onSave={async (updates) => {
-            if (task.id) {
-              await onSave(task.id, updates)
-              onClose()
-            }
-          }}
-          onCancel={onClose}
-        />
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.08)_transparent]">
+          <div className="px-5 py-5">
+            <TaskEditor
+              task={task}
+              onSave={async (updates) => {
+                if (task.id) {
+                  await onSave(task.id, updates)
+                  onClose()
+                }
+              }}
+              onCancel={onClose}
+            />
+          </div>
 
-        {/* Delete Section */}
-        <div className="mt-6 pt-4 border-t border-zinc-800">
-          <button
-            onClick={handleOpenDeleteDialog}
-            className="flex items-center justify-center gap-2 w-full px-4 py-3 border border-red-700 text-red-400 hover:bg-red-950 rounded-lg font-semibold transition-all"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-            Delete Task
-          </button>
+          {/* Comments */}
+          {task.id && (
+            <div className="border-t border-white/[0.06] px-5 py-5">
+              <CommentSection taskId={task.id} />
+            </div>
+          )}
+
+          {/* Delete */}
+          <div className="px-5 pb-5">
+            <button
+              onClick={() => setShowDeleteDialog(true)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-zinc-700 border border-white/[0.06] hover:bg-rose-500/10 hover:text-rose-400 hover:border-rose-500/20 transition-all"
+              style={{ fontFamily: "'DM Sans', sans-serif" }}
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M2 4h10M5 4V2.5h4V4M5.5 6.5v4M8.5 6.5v4M3 4l.75 7.5h6.5L11 4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Delete Task
+            </button>
+          </div>
         </div>
-
-        {/* Delete Confirmation Dialog */}
-        <ConfirmDialog
-          isOpen={showDeleteDialog}
-          onClose={() => setShowDeleteDialog(false)}
-          onConfirm={handleDeleteConfirmed}
-          title="Delete Task"
-          message="Are you sure you want to delete this task? This action cannot be undone."
-          confirmText="Delete"
-          cancelText="Cancel"
-          variant="danger"
-        />
       </div>
+
+      <ConfirmDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={async () => {
+          await onDelete(task.id!)
+          onClose()
+        }}
+        title="Delete Task"
+        message="Are you sure you want to delete this task? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   )
 }
