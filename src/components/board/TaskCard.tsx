@@ -370,6 +370,7 @@ export default function TaskCard({ task }: Props) {
   const updateTask  = useKanbanStore(s => s.updateTask)
   const deleteTask  = useKanbanStore(s => s.deleteTask)
   const archiveTask = useKanbanStore(s => s.archiveTask)
+  const duplicateTask = useKanbanStore(s => s.duplicateTask)
 
   const [editingTitle,  setEditingTitle]  = useState(false)
   const [editingDesc,   setEditingDesc]   = useState(false)
@@ -385,6 +386,7 @@ export default function TaskCard({ task }: Props) {
   const [isAttachmentsExpanded, setIsAttachmentsExpanded] = useState(false)
   const [comments,      setComments]      = useState<KanbanComment[]>([])
   const [showComments,  setShowComments]  = useState(false)
+  const [commentPage,   setCommentPage]   = useState(0)
 
   const menuBtnRef  = useRef<HTMLButtonElement>(null)
   const quickBtnRef = useRef<HTMLButtonElement>(null)
@@ -514,6 +516,9 @@ export default function TaskCard({ task }: Props) {
     { label: "Edit task",
       icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9.5 2l2.5 2.5L4 12.5H1.5V10L9.5 2z" strokeLinejoin="round" strokeLinecap="round" /></svg>,
       onClick: () => setModalOpen(true) },
+    { label: "Duplicate task",
+      icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><path d="M9 3h5v5"/></svg>,
+      onClick: () => duplicateTask(task.id!) },
     { separator: true } as const,
     { label: "Priority: Medium",   icon: <span className="w-2 h-2 rounded-full bg-sky-400 block" />,   onClick: () => updateTask(task.id!, { priority: "medium" }),   disabled: priority === "medium" },
     { label: "Priority: High",     icon: <span className="w-2 h-2 rounded-full bg-amber-400 block" />, onClick: () => updateTask(task.id!, { priority: "high" }),     disabled: priority === "high" },
@@ -797,14 +802,45 @@ export default function TaskCard({ task }: Props) {
               {/* Expanded comments */}
               {showComments && (
                 <div className="mt-1 space-y-1.5 w-full max-h-60 overflow-y-auto">
-                  {comments.slice(0, 5).map((comment: KanbanComment) => (
-                      <div key={comment.id} className="bg-white/[0.04] border border-[var(--border,rgba(255,255,255,0.06))] rounded-lg px-2.5 py-2">
-                        <p className="text-xs text-[var(--text-secondary,#a8a8b0)] leading-relaxed whitespace-pre-wrap">{comment.text}</p>
-                        <p className="text-[10px] text-[var(--text-muted,#666670)] mt-1.5">
-                        {new Date(comment.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                  ))}
+                  {(() => {
+                    const commentsPerPage = 5
+                    const start = commentPage * commentsPerPage
+                    const end = start + commentsPerPage
+                    const pageComments = comments.slice(start, end)
+                    const totalPages = Math.ceil(comments.length / commentsPerPage)
+                    
+                    return (
+                      <div className="space-y-1.5">
+                        {pageComments.map((comment: KanbanComment) => (
+                          <div key={comment.id} className="bg-white/[0.04] border border-[var(--border,rgba(255,255,255,0.06))] rounded-lg px-2.5 py-2">
+                            <p className="text-xs text-[var(--text-secondary,#a8a8b0)] leading-relaxed whitespace-pre-wrap">{comment.text}</p>
+                            <p className="text-[10px] text-[var(--text-muted,#666670)] mt-1.5">
+                              {new Date(comment.createdAt).toLocaleString()}
+                            </p>
+                          </div>
+                        ))}
+                        {totalPages > 1 && (
+                          <div className="flex items-center justify-center gap-1 pt-1 text-[10px] text-[var(--text-muted,#666670)]">
+                            <button
+                              onClick={() => setCommentPage(p => Math.max(0, p - 1))}
+                              disabled={commentPage === 0}
+                              className="px-1.5 py-0.5 rounded hover:bg-white/10 disabled:opacity-50 disabled:pointer-events-none transition"
+                            >
+                              ←
+                            </button>
+                            <span>{commentPage + 1} / {totalPages}</span>
+                            <button
+                              onClick={() => setCommentPage(p => Math.min(totalPages - 1, p + 1))}
+                              disabled={commentPage === totalPages - 1}
+                              className="px-1.5 py-0.5 rounded hover:bg-white/10 disabled:opacity-50 disabled:pointer-events-none transition"
+                            >
+                              →
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </div>
               )}
             </div>

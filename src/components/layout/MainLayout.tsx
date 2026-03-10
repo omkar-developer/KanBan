@@ -6,11 +6,12 @@ import TopBar from "./Topbar"
 interface Props {
   children: React.ReactNode
   boardName?: string
+  boardId?: string
   onBoardChange?: (boardId: string | null) => void
   onSettingsClick?: () => void
 }
 
-export default function MainLayout({ children, boardName, onBoardChange, onSettingsClick }: Props) {
+export default function MainLayout({ children, boardName, boardId, onBoardChange, onSettingsClick }: Props) {
   const loadBoards = useKanbanStore(s => s.loadBoards)
 
   useEffect(() => {
@@ -24,7 +25,7 @@ export default function MainLayout({ children, boardName, onBoardChange, onSetti
 
       <div className="flex flex-col flex-1 overflow-hidden">
         {/* Top Bar */}
-        {boardName && <TopBar boardName={boardName} onSettingsClick={onSettingsClick} />}
+        {boardName && <TopBar boardName={boardName} boardId={boardId} onSettingsClick={onSettingsClick} />}
 
         {/* Main Content */}
         <main className="flex-1 overflow-auto" style={{ backgroundColor: 'var(--bg-app)' }}>

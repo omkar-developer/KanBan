@@ -18,7 +18,7 @@ function App() {
   if (selectedBoardId) {
     const selectedBoard = boards.find(b => b.id === selectedBoardId)
     return (
-      <MainLayout boardName={selectedBoard?.name} onBoardChange={setSelectedBoardId}>
+      <MainLayout boardName={selectedBoard?.name} boardId={selectedBoardId} onBoardChange={setSelectedBoardId}>
         <BoardPage boardId={selectedBoardId} />
       </MainLayout>
     )

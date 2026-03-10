@@ -22,6 +22,7 @@ import { useKanbanStore } from "../../state/kanbanStore"
 import TaskCard from "./TaskCard"
 import TaskModal from "../task/TaskModal"
 import DropdownMenu from "../ui/DropdownMenu"
+import { parseQuickAdd, hasQuickAddSyntax } from "../../utils/quickAddParser"
 
 // ── Icon registry ─────────────────────────────────────────────────────────
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -98,6 +99,8 @@ export default function Column({ column, tasks, index }: Props) {
   }
   const [sortKey,        setSortKey]        = useState<SortKey>("order")
   const [sortDir,        setSortDir]        = useState<SortDir>("asc")
+  const [isEditingTitle, setIsEditingTitle]  = useState(false)
+  const [tempTitle,      setTempTitle]       = useState(column.name)
   const [filterPriority, setFilterPriority] = useState<FilterP>("all")
   const [filterType,     setFilterType]     = useState<FilterT>("all")
   const [newTask,        setNewTask]        = useState<Task | null>(null)
@@ -133,6 +136,19 @@ export default function Column({ column, tasks, index }: Props) {
   const saveAppearance = (ic: string, color: string, hidden?: boolean) =>
     updateColumn({ ...column, icon: ic, color, hidden: hidden ?? collapsed })
 
+  const handleTitleDoubleClick = () => {
+    setIsEditingTitle(true)
+    setTempTitle(column.name)
+  }
+
+  const saveTitle = async () => {
+    const trimmed = tempTitle.trim()
+    if (trimmed && trimmed !== column.name) {
+      await updateColumn({ ...column, name: trimmed })
+    }
+    setIsEditingTitle(false)
+  }
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (
@@ -152,10 +168,28 @@ export default function Column({ column, tasks, index }: Props) {
   }, [showIconPanel])
 
   const submitQuick = async () => {
-    const trimmed = quickTitle.trim()
-    if (!trimmed) return
-    await createTask(column.id, trimmed)
-    setQuickTitle("")
+    const input = quickTitle.trim()
+    if (!input) return
+
+    let title: string
+    const extra: Partial<Task> = {}
+
+    // Parse quick-add syntax if present
+    if (hasQuickAddSyntax(input)) {
+      const parsed = parseQuickAdd(input)
+      title = parsed.title
+      if (parsed.priority) extra.priority = parsed.priority
+      if (parsed.tags.length > 0) extra.tags = parsed.tags
+      if (parsed.dueDate) extra.dueDate = parsed.dueDate
+    } else {
+      title = input
+    }
+
+    // Don't create task if title is empty after parsing
+    if (title.trim()) {
+      await createTask(column.id, title, extra)
+      setQuickTitle("")
+    }
   }
 
   const openNewTaskModal = () => {
@@ -326,9 +360,33 @@ export default function Column({ column, tasks, index }: Props) {
                   document.body
                 )}
 
-                <h3 className="font-semibold text-[var(--text-primary,#f0f0f0)] text-sm tracking-tight truncate" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-                  {column.name}
-                </h3>
+                {isEditingTitle ? (
+                  <input
+                    type="text"
+                    value={tempTitle}
+                    onChange={(e) => setTempTitle(e.target.value)}
+                    onBlur={saveTitle}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") saveTitle()
+                      if (e.key === "Escape") {
+                        setIsEditingTitle(false)
+                        setTempTitle(column.name)
+                      }
+                    }}
+                    autoFocus
+                    className="font-semibold text-[var(--text-primary,#f0f0f0)] text-sm bg-white/[0.08] border border-white/[0.2] rounded px-2 py-1 w-full outline-none"
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}
+                  />
+                ) : (
+                  <h3
+                    onDoubleClick={handleTitleDoubleClick}
+                    className="font-semibold text-[var(--text-primary,#f0f0f0)] text-sm tracking-tight truncate cursor-pointer hover:bg-white/[0.06] rounded px-1 -mx-1 py-0.5 transition"
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}
+                    title="Double-click to edit"
+                  >
+                    {column.name}
+                  </h3>
+                )}
               </div>
 
               <div className="flex items-center gap-1 flex-shrink-0" onPointerDown={e => e.stopPropagation()}>
@@ -340,6 +398,14 @@ export default function Column({ column, tasks, index }: Props) {
                   onClick={openNewTaskModal}
                   className="w-6 h-6 flex items-center justify-center rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition" title="New task (full editor)">
                   <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 2v10M2 7h10" strokeLinecap="round" /></svg>
+                </button>
+                <button
+                  onPointerDown={e => e.stopPropagation()}
+                  onClick={() => { const next = !collapsed; setCollapsed(next); saveAppearance(icon, iconColor, next) }}
+                  className="w-6 h-6 flex items-center justify-center rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition" title={collapsed ? "Expand column" : "Collapse column"}>
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d={collapsed ? "M3 9l4-4 4 4" : "M3 5l4 4 4-4"} strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </button>
                 <button
                   ref={colMenuBtnRef}

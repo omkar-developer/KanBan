@@ -11,9 +11,26 @@ interface KanbanState {
   columns:     Column[]
   tasks:       Task[]
   activeBoard?: string
+  activeTags:  string[] // Multi-select tag filter
+  searchQuery: string // Global search query
+  viewMode:    'board' | 'list' | 'grid' | 'archive' // Current view mode
+  showArchived: boolean // Toggle to show archived tasks
 
   loadBoards:  () => Promise<void>
   loadBoard:   (boardId: string) => Promise<void>
+  
+  // Tag filtering
+  setActiveTags: (tags: string[]) => void
+  toggleTag: (tag: string) => void
+  
+  // Search
+  setSearchQuery: (query: string) => void
+  
+  // View mode
+  setViewMode: (mode: 'board' | 'list' | 'grid' | 'archive') => void
+  
+  // Archive toggle
+  setShowArchived: (show: boolean) => void
 
   createBoard: (name: string) => Promise<void>
   createColumn:(boardId: string, name: string) => Promise<void>
@@ -25,6 +42,7 @@ interface KanbanState {
   deleteTask:  (taskId: string) => Promise<void>
   archiveTask: (taskId: string) => Promise<void>
   unarchiveTask:(taskId: string, columnId: string) => Promise<void>
+  duplicateTask: (taskId: string) => Promise<void>
 
   reorderTasksOptimistic: (taskId: string, toColumnId: string, toIndex: number) => void
   persistTaskOrder:       (columnIds: string[]) => Promise<void>
@@ -36,12 +54,33 @@ interface KanbanState {
 }
 
 export const useKanbanStore = create<KanbanState>((set, get) => ({
-  boards: [], columns: [], tasks: [], activeBoard: undefined,
+  boards: [], columns: [], tasks: [], activeBoard: undefined, activeTags: [], searchQuery: "", viewMode: 'board', showArchived: false,
 
   async loadBoards() {
     const boards = await store.getBoards()
     set({ boards })
   },
+
+  // Tag filtering functions
+  setActiveTags: (tags) => set({ activeTags: tags }),
+  
+  // Search function
+  setSearchQuery: (query) => set({ searchQuery: query }),
+  
+  // View mode
+  setViewMode: (mode: 'board' | 'list' | 'grid' | 'archive') => set({ viewMode: mode }),
+  
+  // Archive toggle
+  setShowArchived: (show: boolean) => set({ showArchived: show }),
+  
+  toggleTag: (tag) => set(s => {
+    const exists = s.activeTags.includes(tag)
+    return {
+      activeTags: exists 
+        ? s.activeTags.filter(t => t !== tag)
+        : [...s.activeTags, tag]
+    }
+  }),
 
   async loadBoard(boardId) {
     const columns = await store.getColumns(boardId)
@@ -79,6 +118,29 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
       columns: s.columns.filter(c => c.id !== columnId),
       tasks:   s.tasks.filter(t => t.columnId !== columnId),
     }))
+  },
+
+  async duplicateTask(taskId) {
+    const task = get().tasks.find(t => t.id === taskId)
+    if (!task) return
+    
+    // Duplicate all properties except id, createdAt, and updatedAt
+    const { id, createdAt, updatedAt, ...duplicateData } = task
+    const duplicatedTask: Task = {
+      ...duplicateData,
+      id: crypto.randomUUID(),
+      title: `${task.title} (copy)`,
+      createdAt: Date.now(),
+    }
+    
+    await get().createTask(task.columnId, duplicatedTask.title, {
+      description: duplicatedTask.description,
+      tags: duplicatedTask.tags,
+      priority: duplicatedTask.priority,
+      dueDate: duplicatedTask.dueDate,
+      attachments: duplicatedTask.attachments,
+      data: duplicatedTask.data,
+    })
   },
 
   async createTask(columnId, title, extra) {
