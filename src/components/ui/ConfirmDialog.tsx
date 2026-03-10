@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import Modal from './Modal'
 
 interface ConfirmDialogProps {
   isOpen: boolean
   onClose: () => void
-  onConfirm: () => Promise<void> | void
-  title?: string
+  onConfirm: () => void | Promise<void>
+  title: string
   message: string
   confirmText?: string
   cancelText?: string
@@ -16,50 +16,60 @@ export default function ConfirmDialog({
   isOpen,
   onClose,
   onConfirm,
-  title = 'Confirm',
+  title,
   message,
   confirmText = 'Confirm',
   cancelText = 'Cancel',
   variant = 'default',
 }: ConfirmDialogProps) {
-  const [isConfirming, setIsConfirming] = useState(false)
-  const buttonRef = useRef<HTMLButtonElement>(null)
-
   useEffect(() => {
-    if (isOpen && buttonRef.current) {
-      buttonRef.current.focus()
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
     }
   }, [isOpen])
 
   const handleConfirm = async () => {
-    setIsConfirming(true)
-    try {
-      await onConfirm()
-    } finally {
-      setIsConfirming(false)
+    await onConfirm()
+    onClose()
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onClose()
     }
   }
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
-      <p className="text-[var(--text-primary,#f0f0f0)] mb-6">{message}</p>
-      <div className="flex gap-3">
+      <div className="mb-6">
+        <p className="text-zinc-300" style={{ fontFamily: "'DM Sans', sans-serif", color: "var(--text-secondary)" }}>
+          {message}
+        </p>
+      </div>
+      <div className="flex gap-2">
         <button
-          ref={buttonRef}
           onClick={handleConfirm}
-          disabled={isConfirming}
           className={`flex-1 px-4 py-3 rounded-lg font-semibold transition-all ${
             variant === 'danger'
-              ? 'border border-red-700 text-red-400 hover:bg-red-950 disabled:opacity-50'
-              : 'bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50'
+              ? 'bg-rose-600 hover:bg-rose-700'
+              : 'bg-sky-600 hover:bg-sky-700'
           }`}
+          onKeyDown={handleKeyDown}
+          style={{ color: "#fff" }}
+          autoFocus
         >
-          {isConfirming ? '...' : confirmText}
+          {confirmText}
         </button>
         <button
           onClick={onClose}
-          disabled={isConfirming}
-          className="flex-1 px-4 py-3 border border-[var(--border,rgba(255,255,255,0.06))] text-[var(--text-secondary,#a8a8b0)] hover:bg-white/[0.06] rounded-lg font-semibold transition-all disabled:opacity-50"
+          className="flex-1 px-4 py-3 rounded-lg font-semibold transition-all"
+          onKeyDown={handleKeyDown}
+          style={{ backgroundColor: "var(--bg-input)", color: "var(--text-primary)" }}
         >
           {cancelText}
         </button>

@@ -13,21 +13,20 @@ export const indexedDbStore: Store = {
   // =====================
 
   async getBoards(): Promise<Board[]> {
-    return db.boards.orderBy("createdAt").toArray();
+    return db.boards.orderBy("createdAt").toArray()
   },
 
   async createBoard(board: Board): Promise<string> {
+    const now = Date.now()
 
-  const now = Date.now();
+    await db.boards.add({
+      ...board,
+      createdAt: board.createdAt ?? now,
+      updatedAt: now
+    })
 
-  await db.boards.add({
-    ...board,
-    createdAt: board.createdAt ?? now,
-    updatedAt: now
-  });
-
-  return board.id;
-},
+    return board.id
+  },
 
   async updateBoard(board: Board): Promise<void> {
     await db.boards.put({

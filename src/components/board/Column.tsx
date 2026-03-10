@@ -22,6 +22,7 @@ import { useKanbanStore } from "../../state/kanbanStore"
 import TaskCard from "./TaskCard"
 import TaskModal from "../task/TaskModal"
 import DropdownMenu from "../ui/DropdownMenu"
+import ConfirmDialog from "../ui/ConfirmDialog"
 import { parseQuickAdd, hasQuickAddSyntax } from "../../utils/quickAddParser"
 
 // ── Icon registry ─────────────────────────────────────────────────────────
@@ -98,13 +99,27 @@ export default function Column({ column, tasks, index }: Props) {
     background: 'var(--bg-popover, #1c1c1c)',
     border: '1px solid var(--border, rgba(255,255,255,0.06))',
   }
-  const [sortKey,        setSortKey]        = useState<SortKey>("order")
-  const [sortDir,        setSortDir]        = useState<SortDir>("asc")
+  const [sortKey,        setSortKey]        = useState<SortKey>(() => (column.sortKey as SortKey) || "order")
+  const [sortDir,        setSortDir]        = useState<SortDir>(() => (column.sortDir as SortDir) || "asc")
   const [isEditingTitle, setIsEditingTitle]  = useState(false)
   const [tempTitle,      setTempTitle]       = useState(column.name)
-  const [filterPriority, setFilterPriority] = useState<FilterP>("all")
-  const [filterType,     setFilterType]     = useState<FilterT>("all")
+  const [filterPriority, setFilterPriority] = useState<FilterP>(() => (column.filterPriority as FilterP) || "all")
+  const [filterType,     setFilterType]     = useState<FilterT>(() => (column.filterType as FilterT) || "all")
   const [newTask,        setNewTask]        = useState<Task | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  // Persist column state changes to database
+  const saveColumnState = (updates: Partial<ColumnType>) => {
+    updateColumn({ ...column, ...updates })
+  }
+
+  const saveAppearance = (ic: string, color: string, hidden?: boolean, w?: number) =>
+    saveColumnState({ icon: ic, color, hidden: hidden ?? collapsed, width: w ?? width })
+
+  // Save sort/filter state when changed
+  useEffect(() => {
+    saveColumnState({ sortKey, sortDir, filterPriority, filterType })
+  }, [sortKey, sortDir, filterPriority, filterType])
 
   const isFiltered = filterPriority !== "all" || filterType !== "all"
   const isSorted   = sortKey !== "order"
@@ -133,9 +148,6 @@ export default function Column({ column, tasks, index }: Props) {
   const iconBtnRef    = useRef<HTMLButtonElement>(null)
   const colMenuBtnRef = useRef<HTMLButtonElement>(null)
   const iconPanelRef  = useRef<HTMLDivElement>(null)
-
-  const saveAppearance = (ic: string, color: string, hidden?: boolean, w?: number) =>
-    updateColumn({ ...column, icon: ic, color, hidden: hidden ?? collapsed, width: w ?? width })
 
   const handleTitleDoubleClick = () => {
     setIsEditingTitle(true)
@@ -249,7 +261,7 @@ export default function Column({ column, tasks, index }: Props) {
     {
       label: "Delete column", danger: true,
       icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 4h10M5 4V2.5h4V4M5.5 6.5v4M8.5 6.5v4M3 4l.75 7.5h6.5L11 4" strokeLinecap="round" strokeLinejoin="round" /></svg>,
-      onClick: () => deleteColumn(column.id)
+      onClick: () => setShowDeleteConfirm(true)
     },
   ]
 
@@ -560,6 +572,21 @@ export default function Column({ column, tasks, index }: Props) {
       />,
       document.body
     )}
+
+    {/* Delete column confirmation dialog */}
+    <ConfirmDialog
+      isOpen={showDeleteConfirm}
+      onClose={() => setShowDeleteConfirm(false)}
+      onConfirm={() => {
+        deleteColumn(column.id)
+        setShowDeleteConfirm(false)
+      }}
+      title="Delete Column"
+      message={`Are you sure you want to delete "${column.name}"? This will also delete all ${tasks.length} task${tasks.length !== 1 ? 's' : ''} in this column.`}
+      confirmText="Delete"
+      cancelText="Cancel"
+      variant="danger"
+    />
   </>
   )
 }

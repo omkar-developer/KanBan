@@ -1,4 +1,4 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import SettingsPanel from "../ui/SettingsPanel"
 import FilterPanel from "../ui/FilterPanel"
 import DropdownMenu from "../ui/DropdownMenu"
@@ -14,36 +14,200 @@ interface TopBarProps {
   onSettingsClick?: () => void
 }
 
-export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick }: TopBarProps) {
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [filterOpen, setFilterOpen] = useState(false)
-  const [searchInput, setSearchInput] = useState("")
-  const [searchActive, setSearchActive] = useState(false)
-  const [importExportMenuOpen, setImportExportMenuOpen] = useState(false)
-  
-  const boards = useKanbanStore(s => s.boards)
-  const columns = useKanbanStore(s => s.columns)
-  const tasks = useKanbanStore(s => s.tasks)
-  const viewMode = useKanbanStore(s => s.viewMode)
-  const showArchived = useKanbanStore(s => s.showArchived)
-  const activeTags = useKanbanStore(s => s.activeTags)
-  
-  const setViewMode = useKanbanStore(s => s.setViewMode)
-  const setShowArchived = useKanbanStore(s => s.setShowArchived)
-  const setSearchQuery = useKanbanStore(s => s.setSearchQuery)
-  const setActiveTags = useKanbanStore(s => s.setActiveTags)
-  const toggleTag = useKanbanStore(s => s.toggleTag)
-  
-  const handleSettingsClick = onSettingsClick ? () => {
-    onSettingsClick()
-    setSettingsOpen(true)
-  } : () => setSettingsOpen(true)
+// ── Tiny icon helpers ─────────────────────────────────────────────────────────
+function IconBoard() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+      <rect x="2" y="2" width="4" height="12" rx="1" strokeWidth={1.5} />
+      <rect x="8" y="2" width="4" height="8"  rx="1" strokeWidth={1.5} />
+      <rect x="8" y="12" width="4" height="2" rx="1" strokeWidth={1.5} />
+    </svg>
+  )
+}
+function IconList() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 4h10M3 8h10M3 12h10" />
+    </svg>
+  )
+}
+function IconGrid() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+      <rect x="2"  y="2"  width="5" height="5" rx="1" strokeWidth={1.5} />
+      <rect x="9"  y="2"  width="5" height="5" rx="1" strokeWidth={1.5} />
+      <rect x="2"  y="9"  width="5" height="5" rx="1" strokeWidth={1.5} />
+      <rect x="9"  y="9"  width="5" height="5" rx="1" strokeWidth={1.5} />
+    </svg>
+  )
+}
+function IconSearch() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+      <circle cx="7" cy="7" r="4.5" strokeWidth={1.5} />
+      <path strokeLinecap="round" strokeWidth={1.5} d="M10.5 10.5l3 3" />
+    </svg>
+  )
+}
+function IconArchive() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+        d="M2 5h12M3.5 5l.75 8h7.5L12.5 5M6 8.5h4" />
+    </svg>
+  )
+}
+function IconFilter() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+        d="M2 4h12M4.5 8h7M7 12h2" />
+    </svg>
+  )
+}
+function IconSettings() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+      <circle cx="8" cy="8" r="2.5" strokeWidth={1.5} />
+      <path strokeLinecap="round" strokeWidth={1.5}
+        d="M8 2v1.5M8 12.5V14M2 8h1.5M12.5 8H14M3.5 3.5l1 1M11.5 11.5l1 1M12.5 3.5l-1 1M4.5 11.5l-1 1" />
+    </svg>
+  )
+}
+function IconDots() {
+  return (
+    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
+      <circle cx="8" cy="3.5" r="1.5" />
+      <circle cx="8" cy="8"   r="1.5" />
+      <circle cx="8" cy="12.5" r="1.5" />
+    </svg>
+  )
+}
+function IconClose() {
+  return (
+    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 10 10">
+      <path strokeLinecap="round" strokeWidth={2} d="M1 1l8 8M9 1L1 9" />
+    </svg>
+  )
+}
 
-  const handleSearch = () => {
-    setSearchQuery(searchInput)
+// ── View mode config ──────────────────────────────────────────────────────────
+const VIEW_MODES = [
+  { key: "board" as const, label: "Board",  Icon: IconBoard },
+  { key: "list"  as const, label: "List",   Icon: IconList  },
+  { key: "grid"  as const, label: "Grid",   Icon: IconGrid  },
+]
+
+// ── Separator ─────────────────────────────────────────────────────────────────
+function Sep() {
+  return (
+    <div style={{ width: 1, height: 20, backgroundColor: "var(--border)", flexShrink: 0 }} />
+  )
+}
+
+// ── Icon button with hover ────────────────────────────────────────────────────
+function IconBtn({
+  onClick, title, active = false, children, danger = false
+}: {
+  onClick: () => void
+  title: string
+  active?: boolean
+  children: React.ReactNode
+  danger?: boolean
+}) {
+  const [hov, setHov] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        border: "none",
+        cursor: "pointer",
+        transition: "background-color 0.15s, color 0.15s",
+        backgroundColor: active
+          ? "var(--accent, #3b82f6)"
+          : hov
+            ? danger ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.07)"
+            : "transparent",
+        color: active
+          ? "#fff"
+          : hov
+            ? danger ? "#ef4444" : "var(--text-primary, #f0f0f0)"
+            : "var(--text-secondary, #a8a8b0)",
+        flexShrink: 0,
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick }: TopBarProps) {
+  const [settingsOpen,        setSettingsOpen]        = useState(false)
+  const [filterOpen,          setFilterOpen]          = useState(false)
+  const [searchExpanded,      setSearchExpanded]      = useState(false)
+  const [searchInput,         setSearchInput]         = useState("")
+  const [importExportMenuOpen, setImportExportMenuOpen] = useState(false)
+
+  const boards       = useKanbanStore(s => s.boards)
+  const columns      = useKanbanStore(s => s.columns)
+  const tasks        = useKanbanStore(s => s.tasks)
+  const viewMode     = useKanbanStore(s => s.viewMode)
+  const showArchived = useKanbanStore(s => s.showArchived)
+  const activeTags   = useKanbanStore(s => s.activeTags)
+
+  const setViewMode     = useKanbanStore(s => s.setViewMode)
+  const setShowArchived = useKanbanStore(s => s.setShowArchived)
+  const setSearchQuery  = useKanbanStore(s => s.setSearchQuery)
+  const setActiveTags   = useKanbanStore(s => s.setActiveTags)
+  const toggleTag       = useKanbanStore(s => s.toggleTag)
+
+  const currentBoard  = boards.find(b => b.id === boardId)
+  const isNotesBoard  = currentBoard?.type === "notes"
+  const allTags       = [...new Set(tasks.flatMap(t => t.tags || []))].filter(Boolean)
+  const importExportMenuRef = useRef<HTMLButtonElement>(null)
+  const searchInputRef      = useRef<HTMLInputElement>(null)
+
+  // Expand search on Cmd/Ctrl+K
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault()
+        setSearchExpanded(true)
+        setTimeout(() => searchInputRef.current?.focus(), 50)
+      }
+      if (e.key === "Escape" && searchExpanded) {
+        setSearchExpanded(false)
+        setSearchInput("")
+        setSearchQuery("")
+      }
+    }
+    document.addEventListener("keydown", handler)
+    return () => document.removeEventListener("keydown", handler)
+  }, [searchExpanded, setSearchQuery])
+
+  const handleSearchChange = (val: string) => {
+    setSearchInput(val)
+    setSearchQuery(val) // live search — no Enter needed
   }
 
-  const currentBoard = boards.find(b => b.id === boardId)
+  const clearSearch = () => {
+    setSearchInput("")
+    setSearchQuery("")
+    setSearchExpanded(false)
+  }
+
+  const handleSettingsClick = onSettingsClick
+    ? () => { onSettingsClick(); setSettingsOpen(true) }
+    : () => setSettingsOpen(true)
 
   const handleExport = () => {
     if (!currentBoard) return
@@ -55,335 +219,176 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0]
       if (!file) return
-
       try {
         const content = await readFileAsText(file)
         const exported = parseExportJSON(content)
-        
-        if (!exported) {
-          alert("Invalid file format")
-          return
-        }
-
-        // Create new board with imported data
-        const boardId = `board_${Date.now()}`
-        const importedBoard = { ...exported.board, id: boardId }
-        
-        // Save to database
-        await store.createBoard(importedBoard)
-        
+        if (!exported) { alert("Invalid file format"); return }
+        const newBoardId = `board_${Date.now()}`
+        await store.createBoard({ ...exported.board, id: newBoardId })
         const columnIds: Record<string, string> = {}
         for (const col of exported.columns) {
           const newColId = `col_${Date.now()}_${Math.random()}`
           columnIds[col.id] = newColId
-          const newCol: Column = { ...col, id: newColId, boardId }
-          await store.createColumn(newCol)
+          await store.createColumn({ ...col, id: newColId, boardId: newBoardId } as Column)
         }
-
         for (const task of exported.tasks) {
           const newColId = columnIds[task.columnId]
-          if (newColId) {
-            const newTask: Task = { ...task, id: `task_${Date.now()}_${Math.random()}`, columnId: newColId }
-            await store.createTask(newTask)
-          }
+          if (newColId) await store.createTask({ ...task, id: `task_${Date.now()}_${Math.random()}`, columnId: newColId } as Task)
         }
-
-        alert(`Board "${importedBoard.name}" imported successfully!`)
-      } catch (error) {
-        console.error("Import failed:", error)
+        alert(`Board "${exported.board.name}" imported successfully!`)
+      } catch (err) {
+        console.error("Import failed:", err)
         alert("Failed to import board")
       }
     }
     input.click()
   }
 
-  const allTags = [...new Set(tasks.flatMap(t => t.tags || []))].filter(Boolean)
-  const importExportMenuRef = useRef<HTMLButtonElement>(null)
+  // Stats for the board name area
+  const totalTasks    = tasks.filter(t => !(t.data?.archived as boolean)).length
+  const archivedCount = tasks.filter(t => (t.data?.archived as boolean)).length
 
   return (
-    <div className="border-b flex items-center px-6 py-0 gap-4" style={{ 
-      borderColor: 'var(--border)',
-      backgroundColor: 'var(--bg-app)',
-      height: '64px'
-    }}>
-      {/* Board Name */}
-      <h1 className="text-lg font-bold whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>
-        {boardName}
-      </h1>
+    <>
+      <div
+        style={{
+          height: 56,
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          paddingLeft: 16,
+          paddingRight: 12,
+          borderBottom: "1px solid var(--border)",
+          backgroundColor: "var(--bg-app)",
+          fontFamily: "'DM Sans', sans-serif",
+          flexShrink: 0,
+          zIndex: 40,
+          position: "relative",
+        }}
+      >
+        {/* ── Board name + task count ─────────────────────────────────── */}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexShrink: 0 }}>
+          <h1
+            style={{
+              fontSize: 15,
+              fontWeight: 600,
+              color: "var(--text-primary)",
+              whiteSpace: "nowrap",
+              letterSpacing: "-0.01em",
+            }}
+          >
+            {boardName}
+          </h1>
+          {!isNotesBoard && (
+            <span
+              style={{
+                fontSize: 11,
+                color: "var(--text-muted)",
+                fontWeight: 500,
+              }}
+            >
+              {totalTasks} task{totalTasks !== 1 ? "s" : ""}
+              {archivedCount > 0 && ` · ${archivedCount} archived`}
+            </span>
+          )}
+        </div>
 
-      {/* Divider */}
-      <div style={{ width: '1px', height: '32px', backgroundColor: 'var(--border)' }} />
+        <Sep />
 
-      {/* Search Input — now on left */}
-      <div className="relative flex items-center" style={{ width: '240px' }}>
-        <input
-          type="text"
-          placeholder="Search tasks..."
+        {/* ── View mode switcher ──────────────────────────────────────── */}
+        {!isNotesBoard && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              backgroundColor: "var(--bg-popover)",
+              borderRadius: 8,
+              padding: 3,
+              border: "1px solid var(--border)",
+              gap: 1,
+              flexShrink: 0,
+            }}
+          >
+            {VIEW_MODES.map(({ key, label, Icon }) => {
+              const active = viewMode === key
+              return (
+                <ViewModeBtn key={key} active={active} label={label} onClick={() => setViewMode(key)}>
+                  <Icon />
+                </ViewModeBtn>
+              )
+            })}
+          </div>
+        )}
+
+        {/* ── Show archived toggle (list + grid only) ─────────────────── */}
+        {!isNotesBoard && (viewMode === "list" || viewMode === "grid") && (
+          <>
+            <Sep />
+            <ArchivedToggle active={showArchived} count={archivedCount} onClick={() => setShowArchived(!showArchived)} />
+          </>
+        )}
+
+        {/* ── Filter button ───────────────────────────────────────────── */}
+        {!isNotesBoard && (
+          <>
+            <Sep />
+            <FilterBtn active={activeTags.length > 0} count={activeTags.length} onClick={() => setFilterOpen(!filterOpen)} />
+          </>
+        )}
+
+        {/* ── Spacer ─────────────────────────────────────────────────── */}
+        <div style={{ flex: 1 }} />
+
+        {/* ── Search ─────────────────────────────────────────────────── */}
+        <SearchBar
+          ref={searchInputRef}
+          expanded={searchExpanded}
           value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          onFocus={() => setSearchActive(true)}
-          onBlur={() => setSearchActive(false)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              handleSearch()
-            }
-          }}
-          className="w-full px-3 pl-9 py-2 text-sm rounded-lg transition-all outline-none"
-          style={{
-            backgroundColor: 'var(--bg-popover)',
-            color: 'var(--text-primary)',
-            borderColor: searchActive ? 'var(--border-focus)' : 'var(--border)',
-            border: `1px solid ${searchActive ? 'var(--border-focus)' : 'var(--border)'}`,
-          }}
+          onChange={handleSearchChange}
+          onExpand={() => { setSearchExpanded(true); setTimeout(() => searchInputRef.current?.focus(), 50) }}
+          onClear={clearSearch}
         />
-        <svg
-          className="absolute left-3 w-4 h-4 pointer-events-none"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          style={{ color: 'var(--text-muted)' }}
+
+        <Sep />
+
+        {/* ── Settings ───────────────────────────────────────────────── */}
+        <IconBtn onClick={handleSettingsClick} title="Settings">
+          <IconSettings />
+        </IconBtn>
+
+        {/* ── Import / Export ────────────────────────────────────────── */}
+        <button
+          ref={importExportMenuRef}
+          onClick={() => setImportExportMenuOpen(v => !v)}
+          title="Import / Export"
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "var(--text-primary)" }}
+          onMouseLeave={e => { e.currentTarget.style.backgroundColor = importExportMenuOpen ? "rgba(255,255,255,0.07)" : "transparent"; e.currentTarget.style.color = "var(--text-secondary)" }}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 32, height: 32, borderRadius: 8, border: "none", cursor: "pointer",
+            transition: "background-color 0.15s, color 0.15s",
+            backgroundColor: importExportMenuOpen ? "rgba(255,255,255,0.07)" : "transparent",
+            color: "var(--text-secondary)",
+            flexShrink: 0,
+          }}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
+          <IconDots />
+        </button>
+
+        {importExportMenuOpen && (
+          <DropdownMenu
+            items={[
+              { label: "Export Board", onClick: handleExport },
+              { label: "Import Board", onClick: handleImport },
+            ]}
+            onClose={() => setImportExportMenuOpen(false)}
+            anchorRef={importExportMenuRef as React.RefObject<HTMLElement>}
+            align="right"
+          />
+        )}
       </div>
 
-      {/* View Mode Buttons */}
-      <div className="flex items-center gap-1" style={{
-        backgroundColor: 'var(--bg-popover)',
-        borderRadius: '6px',
-        padding: '4px',
-        border: '1px solid var(--border)'
-      }}>
-        {/* Board View */}
-        <button
-          onClick={() => setViewMode('board')}
-          className="p-2 rounded transition-all"
-          style={{
-            backgroundColor: viewMode === 'board' ? 'var(--accent)' : 'transparent',
-            color: viewMode === 'board' ? '#fff' : 'var(--text-secondary)',
-          }}
-          onMouseEnter={(e) => {
-            if (viewMode !== 'board') {
-              e.currentTarget.style.backgroundColor = 'var(--bg-card)'
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (viewMode !== 'board') {
-              e.currentTarget.style.backgroundColor = 'transparent'
-            }
-          }}
-          title="Board View"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 00-2 2m2-2a2 2 0 012 2m-6 0a2 2 0 00-2-2m2 2a2 2 0 01-2-2m0-4h12a2 2 0 012 2v4a2 2 0 01-2 2H3a2 2 0 01-2-2v-4a2 2 0 012-2z" />
-          </svg>
-        </button>
-
-        {/* List View */}
-        <button
-          onClick={() => setViewMode('list')}
-          className="p-2 rounded transition-all"
-          style={{
-            backgroundColor: viewMode === 'list' ? 'var(--accent)' : 'transparent',
-            color: viewMode === 'list' ? '#fff' : 'var(--text-secondary)',
-          }}
-          onMouseEnter={(e) => {
-            if (viewMode !== 'list') {
-              e.currentTarget.style.backgroundColor = 'var(--bg-card)'
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (viewMode !== 'list') {
-              e.currentTarget.style.backgroundColor = 'transparent'
-            }
-          }}
-          title="List View"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
-
-        {/* Grid View */}
-        <button
-          onClick={() => setViewMode('grid')}
-          className="p-2 rounded transition-all"
-          style={{
-            backgroundColor: viewMode === 'grid' ? 'var(--accent)' : 'transparent',
-            color: viewMode === 'grid' ? '#fff' : 'var(--text-secondary)',
-          }}
-          onMouseEnter={(e) => {
-            if (viewMode !== 'grid') {
-              e.currentTarget.style.backgroundColor = 'var(--bg-card)'
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (viewMode !== 'grid') {
-              e.currentTarget.style.backgroundColor = 'transparent'
-            }
-          }}
-          title="Grid View"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-          </svg>
-        </button>
-
-        {/* Archive View */}
-        <button
-          onClick={() => setViewMode('archive')}
-          className="p-2 rounded transition-all"
-          style={{
-            backgroundColor: viewMode === 'archive' ? 'var(--accent)' : 'transparent',
-            color: viewMode === 'archive' ? '#fff' : 'var(--text-secondary)',
-          }}
-          onMouseEnter={(e) => {
-            if (viewMode !== 'archive') {
-              e.currentTarget.style.backgroundColor = 'var(--bg-card)'
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (viewMode !== 'archive') {
-              e.currentTarget.style.backgroundColor = 'transparent'
-            }
-          }}
-          title="Archive View"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Show Archived Toggle */}
-      <button
-        onClick={() => setShowArchived(!showArchived)}
-        className="px-3 py-2 text-sm font-medium rounded transition-all flex items-center gap-2"
-        style={{
-          backgroundColor: showArchived ? 'var(--accent)' : 'var(--bg-popover)',
-          color: showArchived ? '#fff' : 'var(--text-secondary)',
-          border: `1px solid ${showArchived ? 'var(--accent)' : 'var(--border)'}`,
-        }}
-        onMouseEnter={(e) => {
-          if (!showArchived) {
-            e.currentTarget.style.backgroundColor = 'var(--bg-card)'
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!showArchived) {
-            e.currentTarget.style.backgroundColor = 'var(--bg-popover)'
-          }
-        }}
-        title="Toggle archived items"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-        </svg>
-        <span>Archived</span>
-      </button>
-
-      {/* Filter Button */}
-      <button
-        onClick={() => setFilterOpen(!filterOpen)}
-        className="px-3 py-2 text-sm font-medium rounded transition-all flex items-center gap-2"
-        style={{
-          backgroundColor: activeTags.length > 0 ? 'var(--accent)' : 'var(--bg-popover)',
-          color: activeTags.length > 0 ? '#fff' : 'var(--text-secondary)',
-          border: `1px solid ${activeTags.length > 0 ? 'var(--accent)' : 'var(--border)'}`,
-        }}
-        onMouseEnter={(e) => {
-          if (activeTags.length === 0) {
-            e.currentTarget.style.backgroundColor = 'var(--bg-card)'
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (activeTags.length === 0) {
-            e.currentTarget.style.backgroundColor = 'var(--bg-popover)'
-          }
-        }}
-        title="Filter by tags"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-        </svg>
-        {activeTags.length > 0 && <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold rounded-full" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>{activeTags.length}</span>}
-      </button>
-
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* Settings Button */}
-      <button
-        onClick={handleSettingsClick}
-        className="p-2 rounded transition-all"
-        style={{
-          backgroundColor: 'transparent',
-          color: 'var(--text-secondary)',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'var(--bg-popover)'
-          e.currentTarget.style.color = 'var(--text-primary)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'transparent'
-          e.currentTarget.style.color = 'var(--text-secondary)'
-        }}
-        title="Settings"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      </button>
-
-      {/* Import/Export Menu Button (triple dot) */}
-      <button
-        ref={importExportMenuRef}
-        onClick={() => setImportExportMenuOpen(!importExportMenuOpen)}
-        className="p-2 rounded transition-all"
-        style={{
-          backgroundColor: importExportMenuOpen ? 'var(--bg-popover)' : 'transparent',
-          color: 'var(--text-secondary)',
-        }}
-        onMouseEnter={(e) => {
-          if (!importExportMenuOpen) {
-            e.currentTarget.style.backgroundColor = 'var(--bg-popover)'
-          }
-        }}
-        onMouseLeave={(e) => {
-          if (!importExportMenuOpen) {
-            e.currentTarget.style.backgroundColor = 'transparent'
-          }
-        }}
-        title="Import / Export"
-      >
-        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-          <circle cx="12" cy="5" r="2" />
-          <circle cx="12" cy="12" r="2" />
-          <circle cx="12" cy="19" r="2" />
-        </svg>
-      </button>
-
-      {/* Dropdown Menu for Import/Export */}
-      {importExportMenuOpen && (
-        <DropdownMenu
-          items={[
-            {
-              label: "Export Board",
-              onClick: handleExport,
-            },
-            {
-              label: "Import Board",
-              onClick: handleImport,
-            },
-          ]}
-          onClose={() => setImportExportMenuOpen(false)}
-          anchorRef={importExportMenuRef as React.RefObject<HTMLElement>}
-          align="right"
-        />
-      )}
-
-      {/* Filter Panel */}
+      {/* ── Panels ───────────────────────────────────────────────────── */}
       <FilterPanel
         isOpen={filterOpen}
         allTags={allTags}
@@ -392,9 +397,212 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
         onClearTags={() => setActiveTags([])}
         onClose={() => setFilterOpen(false)}
       />
-
-      {/* Settings Panel */}
       <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
-    </div>
+    </>
   )
 }
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function ViewModeBtn({ active, label, onClick, children }: {
+  active: boolean; label: string; onClick: () => void; children: React.ReactNode
+}) {
+  const [hov, setHov] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        display: "flex", alignItems: "center", gap: 5,
+        padding: "4px 8px", borderRadius: 5, border: "none", cursor: "pointer",
+        transition: "background-color 0.12s, color 0.12s",
+        backgroundColor: active
+          ? "var(--accent, #3b82f6)"
+          : hov ? "rgba(255,255,255,0.06)" : "transparent",
+        color: active ? "#fff" : hov ? "var(--text-primary)" : "var(--text-secondary)",
+        fontSize: 12,
+        fontWeight: active ? 600 : 500,
+        fontFamily: "'DM Sans', sans-serif",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+      <span>{label}</span>
+    </button>
+  )
+}
+
+function ArchivedToggle({ active, count, onClick }: { active: boolean; count: number; onClick: () => void }) {
+  const [hov, setHov] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      title={active ? "Hide archived tasks" : "Show archived tasks"}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        display: "flex", alignItems: "center", gap: 6,
+        padding: "5px 10px", borderRadius: 8, border: "none", cursor: "pointer",
+        transition: "background-color 0.15s, color 0.15s, border-color 0.15s",
+        backgroundColor: active
+          ? "rgba(113,113,122,0.18)"
+          : hov ? "rgba(255,255,255,0.05)" : "transparent",
+        color: active ? "var(--text-secondary)" : hov ? "var(--text-primary)" : "var(--text-muted)",
+        fontSize: 12,
+        fontWeight: 500,
+        fontFamily: "'DM Sans', sans-serif",
+        outline: active ? "1px solid rgba(113,113,122,0.3)" : "none",
+        flexShrink: 0,
+      }}
+    >
+      <IconArchive />
+      <span>Archived</span>
+      {count > 0 && (
+        <span style={{
+          fontSize: 10, fontWeight: 700,
+          backgroundColor: active ? "rgba(255,255,255,0.12)" : "rgba(113,113,122,0.2)",
+          color: active ? "var(--text-secondary)" : "var(--text-muted)",
+          borderRadius: 10, padding: "1px 5px",
+          lineHeight: 1.6,
+        }}>{count}</span>
+      )}
+    </button>
+  )
+}
+
+function FilterBtn({ active, count, onClick }: { active: boolean; count: number; onClick: () => void }) {
+  const [hov, setHov] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      title="Filter by tags"
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        display: "flex", alignItems: "center", gap: 6,
+        padding: "5px 10px", borderRadius: 8, border: "none", cursor: "pointer",
+        transition: "background-color 0.15s, color 0.15s",
+        backgroundColor: active
+          ? "rgba(59,130,246,0.15)"
+          : hov ? "rgba(255,255,255,0.05)" : "transparent",
+        color: active ? "var(--accent, #60a5fa)" : hov ? "var(--text-primary)" : "var(--text-muted)",
+        fontSize: 12,
+        fontWeight: 500,
+        fontFamily: "'DM Sans', sans-serif",
+        outline: active ? "1px solid rgba(59,130,246,0.3)" : "none",
+        flexShrink: 0,
+      }}
+    >
+      <IconFilter />
+      <span>Filter</span>
+      {active && (
+        <span style={{
+          fontSize: 10, fontWeight: 700,
+          backgroundColor: "rgba(59,130,246,0.2)",
+          color: "var(--accent, #60a5fa)",
+          borderRadius: 10, padding: "1px 5px",
+          lineHeight: 1.6,
+        }}>{count}</span>
+      )}
+    </button>
+  )
+}
+
+import React, { forwardRef } from "react"
+
+const SearchBar = forwardRef<HTMLInputElement, {
+  expanded: boolean
+  value: string
+  onChange: (v: string) => void
+  onExpand: () => void
+  onClear: () => void
+}>(function SearchBar({ expanded, value, onChange, onExpand, onClear }, ref) {
+  const [hov, setHov] = useState(false)
+
+  if (!expanded) {
+    return (
+      <button
+        onClick={onExpand}
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        title="Search (⌘K)"
+        style={{
+          display: "flex", alignItems: "center", gap: 6,
+          padding: "5px 10px", borderRadius: 8, border: "none", cursor: "pointer",
+          transition: "background-color 0.15s, color 0.15s",
+          backgroundColor: hov ? "rgba(255,255,255,0.05)" : "transparent",
+          color: hov ? "var(--text-primary)" : "var(--text-muted)",
+          fontSize: 12, fontWeight: 500,
+          fontFamily: "'DM Sans', sans-serif",
+          flexShrink: 0,
+        }}
+      >
+        <IconSearch />
+        <span>Search</span>
+        <span style={{
+          fontSize: 10, fontWeight: 600,
+          backgroundColor: "rgba(255,255,255,0.06)",
+          color: "var(--text-muted)",
+          borderRadius: 4, padding: "1px 4px",
+          border: "1px solid var(--border)",
+          letterSpacing: "0.02em",
+        }}>⌘K</span>
+      </button>
+    )
+  }
+
+  return (
+    <div style={{ position: "relative", display: "flex", alignItems: "center", flexShrink: 0 }}>
+      <div style={{
+        position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)",
+        color: "var(--text-muted)", pointerEvents: "none",
+        display: "flex", alignItems: "center",
+      }}>
+        <IconSearch />
+      </div>
+      <input
+        ref={ref}
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder="Search tasks…"
+        autoFocus
+        style={{
+          width: 220,
+          paddingLeft: 32,
+          paddingRight: value ? 32 : 12,
+          paddingTop: 6,
+          paddingBottom: 6,
+          borderRadius: 8,
+          border: "1px solid var(--border-focus, rgba(59,130,246,0.4))",
+          backgroundColor: "var(--bg-popover)",
+          color: "var(--text-primary)",
+          fontSize: 13,
+          fontFamily: "'DM Sans', sans-serif",
+          outline: "none",
+          transition: "width 0.2s",
+          boxShadow: "0 0 0 3px rgba(59,130,246,0.08)",
+        }}
+      />
+      {value && (
+        <button
+          onClick={onClear}
+          style={{
+            position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 18, height: 18, borderRadius: 4, border: "none", cursor: "pointer",
+            backgroundColor: "rgba(255,255,255,0.08)",
+            color: "var(--text-muted)",
+            transition: "background-color 0.12s, color 0.12s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.15)"; e.currentTarget.style.color = "var(--text-primary)" }}
+          onMouseLeave={e => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "var(--text-muted)" }}
+        >
+          <IconClose />
+        </button>
+      )}
+    </div>
+  )
+})

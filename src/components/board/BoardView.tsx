@@ -7,7 +7,6 @@ import Column from "./Column"
 import TextInputDialog from "../ui/TextInputDialog"
 import ListView from "./ListView"
 import CardGridView from "./CardGridView"
-import ArchiveView from "./ArchiveView"
 import NotesView from "./NotesView"
 
 interface Props {
@@ -15,56 +14,25 @@ interface Props {
 }
 
 export default function BoardView({ boardId }: Props) {
-  const activeBoard       = useKanbanStore(s => s.activeBoard)
-  const columns           = useKanbanStore(s => s.columns)
-  const tasks             = useKanbanStore(s => s.tasks)
-  const activeTags        = useKanbanStore(s => s.activeTags)
-  const searchQuery       = useKanbanStore(s => s.searchQuery)
-  const viewMode          = useKanbanStore(s => s.viewMode)
-  const showArchived      = useKanbanStore(s => s.showArchived)
-  const setViewMode       = useKanbanStore(s => s.setViewMode)
-  const setShowArchived   = useKanbanStore(s => s.setShowArchived)
-  const setActiveTags     = useKanbanStore(s => s.setActiveTags)
-  const toggleTag         = useKanbanStore(s => s.toggleTag)
-  const createColumn      = useKanbanStore(s => s.createColumn)
-  const loadBoard         = useKanbanStore(s => s.loadBoard)
-  const moveColumn        = useKanbanStore(s => s.moveColumn)
+  const activeBoard            = useKanbanStore(s => s.activeBoard)
+  const columns                = useKanbanStore(s => s.columns)
+  const tasks                  = useKanbanStore(s => s.tasks)
+  const activeTags             = useKanbanStore(s => s.activeTags)
+  const searchQuery            = useKanbanStore(s => s.searchQuery)
+  const viewMode               = useKanbanStore(s => s.viewMode)
+  const showArchived           = useKanbanStore(s => s.showArchived)
+  const createColumn           = useKanbanStore(s => s.createColumn)
+  const loadBoard              = useKanbanStore(s => s.loadBoard)
+  const moveColumn             = useKanbanStore(s => s.moveColumn)
   const reorderTasksOptimistic = useKanbanStore(s => s.reorderTasksOptimistic)
   const persistTaskOrder       = useKanbanStore(s => s.persistTaskOrder)
 
   const [showAddColumnDialog, setShowAddColumnDialog] = useState(false)
 
-  // Determine board type for rendering logic
-  const boardType = activeBoard?.type || "kanban"
+  const boardType    = activeBoard?.type || "kanban"
+  const isNotesBoard = boardType === "notes"
 
-  // Helper to check if task is archived
-  const isArchived = (task: Task): boolean => {
-    return (task.data?.archived as boolean) === true
-  }
-
-  // Filter tasks based on active tags AND search query
-  const filteredTasks = useMemo(() => {
-    let result = tasks
-    
-    // First filter by tags if any are selected
-    if (activeTags.length > 0) {
-      result = result.filter(task =>
-        task.tags?.some(tag => activeTags.includes(tag))
-      )
-    }
-    
-    // Then filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
-      result = result.filter(task =>
-        task.title.toLowerCase().includes(query) ||
-        (task.description && task.description.toLowerCase().includes(query)) ||
-        task.tags?.some(tag => tag.toLowerCase().includes(query))
-      )
-    }
-    
-    return result
-  }, [tasks, activeTags, searchQuery])
+  const isArchived = (task: Task) => (task.data?.archived as boolean) === true
 
   useEffect(() => { loadBoard(boardId) }, [boardId, loadBoard])
 
@@ -75,159 +43,208 @@ export default function BoardView({ boardId }: Props) {
 
   const onDragEnd = async (result: DropResult) => {
     const { source, destination, type } = result
-
-    // Dropped outside any droppable — do nothing
     if (!destination) return
-
-    // Dropped in same place — do nothing
-    if (
-      source.droppableId === destination.droppableId &&
-      source.index === destination.index
-    ) return
+    if (source.droppableId === destination.droppableId && source.index === destination.index) return
 
     if (type === "COLUMN") {
-      // hello-pangea gives us the exact from/to index — pass straight to store
       await moveColumn(sortedColumns[source.index].id, destination.index)
       return
     }
 
     if (type === "TASK") {
-      const fromColId = source.droppableId
-      const toColId   = destination.droppableId
-      const toIndex   = destination.index
-
-      // Get the dragged task id from the source column tasks in order
+      const fromColId   = source.droppableId
+      const toColId     = destination.droppableId
+      const toIndex     = destination.index
       const sourceTasks = tasks
         .filter(t => t.columnId === fromColId)
         .sort((a, b) => a.order - b.order)
       const movedTaskId = sourceTasks[source.index]?.id
       if (!movedTaskId) return
-
-      // Optimistic update (instant UI)
       reorderTasksOptimistic(movedTaskId, toColId, toIndex)
-
-      // Persist to IndexedDB
-      const colsToPersist = fromColId === toColId
-        ? [fromColId]
-        : [fromColId, toColId]
-      await persistTaskOrder(colsToPersist)
+      await persistTaskOrder(fromColId === toColId ? [fromColId] : [fromColId, toColId])
     }
   }
 
-  // Filter tasks for board view (hide archived unless showArchived is true)
+  // Board view tasks — filtered, no archived unless toggled
   const boardViewTasks = useMemo(() => {
     return tasks.filter(task => {
       if (!showArchived && isArchived(task)) return false
-      
-      // Tag filter
-      if (activeTags.length > 0) {
-        if (!task.tags?.some(tag => activeTags.includes(tag))) return false
-      }
-      
-      // Search filter
+      if (activeTags.length > 0 && !task.tags?.some(tag => activeTags.includes(tag))) return false
       if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase()
+        const q = searchQuery.toLowerCase()
         if (!(
-          task.title.toLowerCase().includes(query) ||
-          (task.description && task.description.toLowerCase().includes(query)) ||
-          task.tags?.some(tag => tag.toLowerCase().includes(query))
+          task.title.toLowerCase().includes(q) ||
+          task.description?.toLowerCase().includes(q) ||
+          task.tags?.some(tag => tag.toLowerCase().includes(q))
         )) return false
       }
-      
       return true
     })
   }, [tasks, activeTags, searchQuery, showArchived])
 
-  const sortedBoardColumns = useMemo(
-    () => [...columns].sort((a, b) => a.order - b.order),
-    [columns]
-  )
-
-  // For notes boards, disable view mode switching
-  const isNotesBoard = boardType === "notes"
-
-  return (
-    <div className="flex-1">
-      {/* Notes Board - Always render NotesView */}
-      {isNotesBoard ? (
+  // ── Notes board ────────────────────────────────────────────────────────────
+  if (isNotesBoard) {
+    return (
+      <div className="flex-1 min-h-0 overflow-hidden">
         <NotesView />
-      ) : (
-        // Kanban Board variants
-        <>
-          {/* View Content */}
-          {viewMode === 'board' && (
-            <DragDropContext onDragEnd={onDragEnd}>
-              {/* Outer scroll container — NOT a Droppable, just a flex row */}
+      </div>
+    )
+  }
+
+  // ── List view — needs its own scroll container so header + footer can stick ─
+  if (viewMode === "list") {
+    return (
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        {/* Scrollable content area */}
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            padding: "20px 24px",
+            // Give the inner ListView access to height for its sticky table header
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <ListView />
+        </div>
+      </div>
+    )
+  }
+
+  // ── Grid view ──────────────────────────────────────────────────────────────
+  if (viewMode === "grid") {
+    return (
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: "auto",
+          padding: "20px 24px",
+        }}
+      >
+        <CardGridView />
+      </div>
+    )
+  }
+
+  // ── Board (kanban) view ────────────────────────────────────────────────────
+  return (
+    <div
+      style={{
+        flex: 1,
+        minHeight: 0,
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <DragDropContext onDragEnd={onDragEnd}>
+        {/* Outer scroll — horizontal only for column overflow */}
+        <div
+          style={{
+            flex: 1,
+            overflowX: "auto",
+            overflowY: "hidden",
+            padding: "24px 32px",
+            display: "flex",
+            backgroundImage: `
+              repeating-linear-gradient(90deg, transparent, transparent 79px, rgba(113,113,122,0.04) 79px, rgba(113,113,122,0.04) 80px),
+              repeating-linear-gradient(0deg,  transparent, transparent 79px, rgba(113,113,122,0.04) 79px, rgba(113,113,122,0.04) 80px)
+            `,
+          }}
+        >
+          {/* Droppable for column reordering — horizontal */}
+          <Droppable droppableId="board" type="COLUMN" direction="horizontal">
+            {(provided: DroppableProvided) => (
               <div
-                className="flex gap-6 overflow-x-auto p-8 min-h-full w-full"
+                ref={provided.innerRef}
+                {...provided.droppableProps}
                 style={{
-                  backgroundImage: `
-                    repeating-linear-gradient(90deg, transparent, transparent 79px, rgba(113,113,122,0.05) 79px, rgba(113,113,122,0.05) 80px),
-                    repeating-linear-gradient(0deg,  transparent, transparent 79px, rgba(113,113,122,0.05) 79px, rgba(113,113,122,0.05) 80px)
-                  `,
+                  display: "flex",
+                  gap: 20,
+                  alignItems: "stretch",
+                  height: "100%",
                 }}
               >
-                {/* Droppable for column reordering — direction horizontal */}
-                <Droppable droppableId="board" type="COLUMN" direction="horizontal">
-                  {(provided: DroppableProvided) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className="flex gap-6 items-stretch"
-                    >
-                      {sortedBoardColumns.map((col, index) => {
-                        const colTasks = boardViewTasks
-                          .filter(t => t.columnId === col.id)
-                          .sort((a, b) => a.order - b.order)
-                        const filteredColTasks = colTasks.filter(t => 
-                          activeTags.length === 0 || 
-                          t.tags?.some(tag => activeTags.includes(tag))
-                        )
-                        return (
-                          <Column
-                            key={col.id}
-                            column={col}
-                            tasks={filteredColTasks}
-                            index={index}
-                          />
-                        )
-                      })}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-
-                {/* Add Column button — outside the droppable so it's never a drag target */}
-                <button
-                  onClick={() => setShowAddColumnDialog(true)}
-                  className="flex-shrink-0 self-start w-[300px] px-6 py-4 rounded-2xl border border-dashed border-white/[0.08] hover:border-white/[0.15] text-zinc-600 hover:text-zinc-400 transition-all flex items-center justify-center gap-2 hover:bg-white/[0.02]"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 14 14">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 2v10M2 7h10" />
-                  </svg>
-                  <span className="text-sm font-medium">Add Column</span>
-                </button>
+                {sortedColumns.map((col, index) => {
+                  const colTasks = boardViewTasks
+                    .filter(t => t.columnId === col.id)
+                    .sort((a, b) => a.order - b.order)
+                  return (
+                    <Column
+                      key={col.id}
+                      column={col}
+                      tasks={colTasks}
+                      index={index}
+                    />
+                  )
+                })}
+                {provided.placeholder}
               </div>
+            )}
+          </Droppable>
 
-              <TextInputDialog
-                isOpen={showAddColumnDialog}
-                onClose={() => setShowAddColumnDialog(false)}
-                onConfirm={async (name) => { await createColumn(boardId, name); setShowAddColumnDialog(false) }}
-                title="Add Column" label="Column Name" placeholder="Enter column name..." required
-              />
-            </DragDropContext>
-          )}
+          {/* Add Column button */}
+          <button
+            onClick={() => setShowAddColumnDialog(true)}
+            style={{
+              flexShrink: 0,
+              alignSelf: "flex-start",
+              width: 280,
+              padding: "14px 24px",
+              borderRadius: 16,
+              border: "1px dashed rgba(255,255,255,0.08)",
+              backgroundColor: "transparent",
+              color: "#52525b",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              marginLeft: 8,
+              transition: "border-color 0.15s, color 0.15s, background-color 0.15s",
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: 13,
+              fontWeight: 500,
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"
+              e.currentTarget.style.color = "#a1a1aa"
+              e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)"
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"
+              e.currentTarget.style.color = "#52525b"
+              e.currentTarget.style.backgroundColor = "transparent"
+            }}
+          >
+            <svg style={{ width: 14, height: 14 }} fill="none" stroke="currentColor" viewBox="0 0 14 14">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 2v10M2 7h10" />
+            </svg>
+            Add Column
+          </button>
+        </div>
 
-          {/* List View */}
-          {viewMode === 'list' && <ListView />}
-
-          {/* Grid View */}
-          {viewMode === 'grid' && <CardGridView />}
-
-          {/* Archive View */}
-          {viewMode === 'archive' && <ArchiveView />}
-        </>
-      )}
+        <TextInputDialog
+          isOpen={showAddColumnDialog}
+          onClose={() => setShowAddColumnDialog(false)}
+          onConfirm={async (name) => { await createColumn(boardId, name); setShowAddColumnDialog(false) }}
+          title="Add Column"
+          label="Column Name"
+          placeholder="Enter column name..."
+          required
+        />
+      </DragDropContext>
     </div>
   )
 }

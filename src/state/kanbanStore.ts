@@ -33,7 +33,10 @@ interface KanbanState {
   // Archive toggle
   setShowArchived: (show: boolean) => void
 
-  createBoard: (name: string, type?: "kanban" | "notes" | "tools", category?: string) => Promise<void>
+  createBoard: (name: string, type?: "kanban" | "notes" | "tools", category?: string, icon?: string, color?: string) => Promise<void>
+  updateBoard: (board: Board) => Promise<void>
+  deleteBoard: (boardId: string) => Promise<void>
+  toggleFavorite: (boardId: string) => Promise<void>
   createColumn:(boardId: string, name: string) => Promise<void>
   updateColumn:(column: Column) => Promise<void>
   deleteColumn:(columnId: string) => Promise<void>
@@ -96,16 +99,36 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
     set({ activeBoard: board, activeBoardId: boardId, columns: sorted, tasks })
   },
 
-  async createBoard(name, type, category) {
+  async createBoard(name, type, category, icon, color) {
     const id = createId()
-    await store.createBoard({ 
-      id, 
-      name, 
-      type: type || "kanban", 
-      category: category || undefined, 
-      createdAt: Date.now() 
+    await store.createBoard({
+      id,
+      name,
+      type: type ?? "kanban",
+      category: category || undefined,
+      icon: icon || undefined,
+      color: color || undefined,
+      createdAt: Date.now()
     })
     await get().loadBoards()
+  },
+
+  async updateBoard(board) {
+    await store.updateBoard(board)
+    set(s => ({ boards: s.boards.map(b => b.id === board.id ? board : b) }))
+  },
+
+  async deleteBoard(boardId) {
+    await store.deleteBoard(boardId)
+    set(s => ({ boards: s.boards.filter(b => b.id !== boardId) }))
+  },
+
+  async toggleFavorite(boardId) {
+    const board = get().boards.find(b => b.id === boardId)
+    if (!board) return
+    const updated = { ...board, favorite: !board.favorite }
+    await store.updateBoard(updated)
+    set(s => ({ boards: s.boards.map(b => b.id === boardId ? updated : b) }))
   },
 
   async createColumn(boardId, name) {

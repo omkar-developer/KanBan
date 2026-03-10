@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, type JSX } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "./MarkdownEditor.css";
@@ -124,24 +124,6 @@ export default function MarkdownEditor({
     }
   }, [readOnly, applyToolbar]);
 
-  // Custom heading component for markdown to highlight wiki links
-  const HeadingComponent = (props: any) => {
-    const { children, level } = props;
-    const HeadTag = `h${level}` as any;
-    return (
-      <HeadTag className={`heading-${level}`}>
-        {renderWikiLinks(typeof children === "string" ? children : "")}
-      </HeadTag>
-    );
-  };
-
-  // Custom paragraph component
-  const ParagraphComponent = (props: any) => {
-    const { children } = props;
-    const text = typeof children === "string" ? children : "";
-    return <p>{renderWikiLinks(text)}</p>;
-  };
-
   return (
     <div className="markdown-editor">
       {/* Toolbar */}
@@ -164,32 +146,19 @@ export default function MarkdownEditor({
       )}
 
       {/* Toggle preview/edit */}
-      {value && (
-        <div className="editor-controls">
-          <button
-            onClick={() => setPreviewMode(!previewMode)}
-            className="preview-toggle"
-          >
-            {previewMode ? "✏ Edit" : "👁 Preview"}
-          </button>
-        </div>
-      )}
+      <div className="editor-controls">
+        <button
+          onClick={() => setPreviewMode(!previewMode)}
+          className="preview-toggle"
+        >
+          {previewMode ? "✏ Edit" : "👁 Preview"}
+        </button>
+      </div>
 
       {/* Editor or Preview */}
       {previewMode ? (
         <div className="markdown-preview">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{
-              p: ParagraphComponent,
-              h1: HeadingComponent,
-              h2: HeadingComponent,
-              h3: HeadingComponent,
-              h4: HeadingComponent,
-              h5: HeadingComponent,
-              h6: HeadingComponent,
-            }}
-          >
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
             {value || "*Nothing yet…*"}
           </ReactMarkdown>
         </div>
