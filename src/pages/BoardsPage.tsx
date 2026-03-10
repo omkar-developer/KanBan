@@ -11,6 +11,8 @@ export default function BoardsPage({ onSelectBoard }: Props) {
   const createBoard = useKanbanStore(s => s.createBoard)
 
   const [name, setName] = useState("")
+  const [boardType, setBoardType] = useState<"kanban" | "notes" | "tools">("kanban")
+  const [category, setCategory] = useState("")
 
   useEffect(() => {
     loadBoards()
@@ -18,8 +20,9 @@ export default function BoardsPage({ onSelectBoard }: Props) {
 
   async function handleCreate() {
     if (!name.trim()) return
-    await createBoard(name.trim())
+    await createBoard(name.trim(), boardType, category.trim() || undefined)
     setName("")
+    setCategory("")
   }
 
   const handleSelectBoard = (boardId: string) => {
@@ -38,21 +41,53 @@ export default function BoardsPage({ onSelectBoard }: Props) {
         {/* Create Board Section */}
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-6 mb-12 shadow-xl">
           <label className="block text-sm font-semibold text-zinc-400 mb-4">CREATE NEW BOARD</label>
-          <div className="flex gap-3">
+          <div className="space-y-4">
+            {/* Name Input */}
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter board name..."
-              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               onKeyDown={(e) => e.key === "Enter" && handleCreate()}
             />
+
+            {/* Board Type and Category Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Board Type Dropdown */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-500 mb-2 uppercase">Board Type</label>
+                <select
+                  value={boardType}
+                  onChange={(e) => setBoardType(e.target.value as "kanban" | "notes" | "tools")}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all appearance-none cursor-pointer"
+                >
+                  <option value="kanban">Kanban</option>
+                  <option value="notes">Notes</option>
+                  <option value="tools">Tools</option>
+                </select>
+              </div>
+
+              {/* Category Input */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-500 mb-2 uppercase">Category (Optional)</label>
+                <input
+                  type="text"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  placeholder="e.g., Work, Personal..."
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Create Button */}
             <button
               onClick={handleCreate}
               disabled={!name.trim()}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-700 disabled:text-zinc-500 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-700 disabled:text-zinc-500 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
             >
-              Create
+              Create Board
             </button>
           </div>
         </div>

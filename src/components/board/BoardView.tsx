@@ -8,12 +8,14 @@ import TextInputDialog from "../ui/TextInputDialog"
 import ListView from "./ListView"
 import CardGridView from "./CardGridView"
 import ArchiveView from "./ArchiveView"
+import NotesView from "./NotesView"
 
 interface Props {
   boardId: string
 }
 
 export default function BoardView({ boardId }: Props) {
+  const activeBoard       = useKanbanStore(s => s.activeBoard)
   const columns           = useKanbanStore(s => s.columns)
   const tasks             = useKanbanStore(s => s.tasks)
   const activeTags        = useKanbanStore(s => s.activeTags)
@@ -31,6 +33,9 @@ export default function BoardView({ boardId }: Props) {
   const persistTaskOrder       = useKanbanStore(s => s.persistTaskOrder)
 
   const [showAddColumnDialog, setShowAddColumnDialog] = useState(false)
+
+  // Determine board type for rendering logic
+  const boardType = activeBoard?.type || "kanban"
 
   // Helper to check if task is archived
   const isArchived = (task: Task): boolean => {
@@ -138,24 +143,32 @@ export default function BoardView({ boardId }: Props) {
     [columns]
   )
 
+  // For notes boards, disable view mode switching
+  const isNotesBoard = boardType === "notes"
+
   return (
     <div className="flex-1">
-      {/* View Content */}
-      {viewMode === 'board' && (
-        <DragDropContext onDragEnd={onDragEnd}>
-          {/* Outer scroll container — NOT a Droppable, just a flex row */}
-          <div
-            className="flex gap-6 overflow-x-auto p-8 min-h-full w-full"
-            style={{
-              backgroundImage: `
-                repeating-linear-gradient(90deg, transparent, transparent 79px, rgba(113,113,122,0.05) 79px, rgba(113,113,122,0.05) 80px),
-                repeating-linear-gradient(0deg,  transparent, transparent 79px, rgba(113,113,122,0.05) 79px, rgba(113,113,122,0.05) 80px)
-              `,
-            }}
-          >
-            {/* Droppable for column reordering — direction horizontal */}
-            {/* We render it as a transparent flex wrapper so columns stay side by side */}
-            <Droppable droppableId="board" type="COLUMN" direction="horizontal">
+      {/* Notes Board - Always render NotesView */}
+      {isNotesBoard ? (
+        <NotesView />
+      ) : (
+        // Kanban Board variants
+        <>
+          {/* View Content */}
+          {viewMode === 'board' && (
+            <DragDropContext onDragEnd={onDragEnd}>
+              {/* Outer scroll container — NOT a Droppable, just a flex row */}
+              <div
+                className="flex gap-6 overflow-x-auto p-8 min-h-full w-full"
+                style={{
+                  backgroundImage: `
+                    repeating-linear-gradient(90deg, transparent, transparent 79px, rgba(113,113,122,0.05) 79px, rgba(113,113,122,0.05) 80px),
+                    repeating-linear-gradient(0deg,  transparent, transparent 79px, rgba(113,113,122,0.05) 79px, rgba(113,113,122,0.05) 80px)
+                  `,
+                }}
+              >
+                {/* Droppable for column reordering — direction horizontal */}
+                <Droppable droppableId="board" type="COLUMN" direction="horizontal">
                   {(provided: DroppableProvided) => (
                     <div
                       ref={provided.innerRef}
@@ -184,35 +197,37 @@ export default function BoardView({ boardId }: Props) {
                   )}
                 </Droppable>
 
-              {/* Add Column button — outside the droppable so it's never a drag target */}
-              <button
-                onClick={() => setShowAddColumnDialog(true)}
-                className="flex-shrink-0 self-start w-[300px] px-6 py-4 rounded-2xl border border-dashed border-white/[0.08] hover:border-white/[0.15] text-zinc-600 hover:text-zinc-400 transition-all flex items-center justify-center gap-2 hover:bg-white/[0.02]"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 14 14">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 2v10M2 7h10" />
-                </svg>
-                <span className="text-sm font-medium">Add Column</span>
-              </button>
-            </div>
+                {/* Add Column button — outside the droppable so it's never a drag target */}
+                <button
+                  onClick={() => setShowAddColumnDialog(true)}
+                  className="flex-shrink-0 self-start w-[300px] px-6 py-4 rounded-2xl border border-dashed border-white/[0.08] hover:border-white/[0.15] text-zinc-600 hover:text-zinc-400 transition-all flex items-center justify-center gap-2 hover:bg-white/[0.02]"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 14 14">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 2v10M2 7h10" />
+                  </svg>
+                  <span className="text-sm font-medium">Add Column</span>
+                </button>
+              </div>
 
-            <TextInputDialog
-              isOpen={showAddColumnDialog}
-              onClose={() => setShowAddColumnDialog(false)}
-              onConfirm={async (name) => { await createColumn(boardId, name); setShowAddColumnDialog(false) }}
-              title="Add Column" label="Column Name" placeholder="Enter column name..." required
-            />
-          </DragDropContext>
-        )}
+              <TextInputDialog
+                isOpen={showAddColumnDialog}
+                onClose={() => setShowAddColumnDialog(false)}
+                onConfirm={async (name) => { await createColumn(boardId, name); setShowAddColumnDialog(false) }}
+                title="Add Column" label="Column Name" placeholder="Enter column name..." required
+              />
+            </DragDropContext>
+          )}
 
-        {/* List View */}
-        {viewMode === 'list' && <ListView />}
+          {/* List View */}
+          {viewMode === 'list' && <ListView />}
 
-        {/* Grid View */}
-        {viewMode === 'grid' && <CardGridView />}
+          {/* Grid View */}
+          {viewMode === 'grid' && <CardGridView />}
 
-        {/* Archive View */}
-        {viewMode === 'archive' && <ArchiveView />}
-      </div>
-    )
+          {/* Archive View */}
+          {viewMode === 'archive' && <ArchiveView />}
+        </>
+      )}
+    </div>
+  )
 }

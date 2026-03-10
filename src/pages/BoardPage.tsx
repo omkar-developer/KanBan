@@ -7,11 +7,16 @@ interface Props {
 }
 
 export default function BoardPage({ boardId }: Props) {
-  const loadBoard = useKanbanStore(s => s.loadBoard)
+  const loadBoards = useKanbanStore(s => s.loadBoards)
+  const loadBoard  = useKanbanStore(s => s.loadBoard)
 
   useEffect(() => {
+    // Load all boards to get metadata
+    loadBoards()
+    
+    // Then load the specific board
     loadBoard(boardId)
-  }, [boardId, loadBoard])
+  }, [boardId, loadBoards, loadBoard])
 
   return (
     <BoardView boardId={boardId} />

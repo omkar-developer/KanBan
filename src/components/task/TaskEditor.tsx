@@ -115,6 +115,9 @@ const TaskEditor = forwardRef<TaskEditorHandle, Props>(function TaskEditor({ tas
   const [previewDesc, setPreviewDesc] = useState(false)
   const [lightbox,    setLightbox]    = useState<AttachmentMeta | null>(null)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  const [noteCategory, setNoteCategory] = useState<string>(() => {
+    return (task.data?.category as string) || "Uncategorized"
+  })
 
   const fileRef    = useRef<HTMLInputElement>(null)
   const descRef    = useRef<HTMLTextAreaElement>(null)
@@ -127,24 +130,36 @@ const TaskEditor = forwardRef<TaskEditorHandle, Props>(function TaskEditor({ tas
     buttonDisabled: { opacity: 0.25, pointerEvents: "none" as const },
   })
 
-  const getValues = useCallback((): Partial<Task> => ({
-    title:       title.trim(),
-    description: desc.trim() || undefined,
-    priority, type,
-    tags:        tags.length > 0 ? tags : undefined,
-    dueDate:     dueDate ? new Date(dueDate).getTime() : undefined,
-    attachments: attachments.length > 0 ? attachments : undefined,
-  }), [title, desc, priority, type, tags, dueDate, attachments])
+  const getValues = useCallback((): Partial<Task> => {
+    // For notes, include category in data
+    const newData: Record<string, unknown> = { ...task.data }
+    if (type === "note" && noteCategory) {
+      newData.category = noteCategory
+    } else if (type !== "note") {
+      delete newData.category
+    }
+    
+    return {
+      title:       title.trim(),
+      description: desc.trim() || undefined,
+      priority, type,
+      tags:        tags.length > 0 ? tags : undefined,
+      dueDate:     dueDate ? new Date(dueDate).getTime() : undefined,
+      attachments: attachments.length > 0 ? attachments : undefined,
+      data:        Object.keys(newData).length > 0 ? newData : undefined,
+    }
+  }, [title, desc, priority, type, tags, dueDate, attachments, noteCategory, task.data])
 
   const isDirty = useCallback(() =>
     title.trim()    !== (task.title ?? "") ||
     desc.trim()     !== (task.description ?? "") ||
     priority        !== (task.priority ?? "low") ||
     type            !== (task.type ?? "task") ||
+    noteCategory    !== ((task.data?.category as string) || "Uncategorized") ||
     dueDate         !== (task.dueDate ? new Date(task.dueDate).toISOString().split("T")[0] : "") ||
     JSON.stringify(tags)        !== JSON.stringify(task.tags ?? []) ||
     JSON.stringify(attachments) !== JSON.stringify(task.attachments ?? [])
-  , [title, desc, priority, type, dueDate, tags, attachments, task])
+  , [title, desc, priority, type, noteCategory, dueDate, tags, attachments, task])
 
   // Expose handle for TaskModal auto-save
   useImperativeHandle(ref, () => ({ isDirty, getValues }), [isDirty, getValues])
@@ -406,7 +421,7 @@ const TaskEditor = forwardRef<TaskEditorHandle, Props>(function TaskEditor({ tas
                     <p style={{ color: "var(--text-muted)", fontSize: 10 }}>{formatBytes(att.size)}</p>
                   </div>
                   <a href={att.data} download={att.name} className="opacity-60 hover:opacity-100 transition p-1 rounded-lg hover:bg-white/[0.06]" title="Download">
-                    <svg style={{ color: "var(--text-muted)" }} className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M7 2v7M4.5 6.5L7 9l2.5-2.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 11h10" strokeLinecap="round"/></svg>
+                    <svg style={{ color: "var(--text-muted)" }} className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M7 9V2M4 5l3-3 3 3" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 11h10" strokeLinecap="round"/></svg>
                   </a>
                   <button onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))}
                     className="opacity-50 hover:opacity-100 hover:bg-rose-500/10 transition p-1 rounded-lg" title="Remove">
@@ -425,6 +440,24 @@ const TaskEditor = forwardRef<TaskEditorHandle, Props>(function TaskEditor({ tas
         </button>
       </div>
       </div>
+
+      {/* Category (only for notes) */}
+      {type === "note" && (
+        <div style={{ marginBottom: 16 }}>
+          <span style={getStyles().label}>Category</span>
+          <input 
+            type="text" 
+            value={noteCategory} 
+            onChange={e => setNoteCategory(e.target.value)}
+            placeholder="Enter category name..."
+            style={{ backgroundColor: "var(--bg-input)", color: "var(--text-primary)" }}
+            className={inputClass}
+          />
+          <p style={{ color: "var(--text-muted)", fontSize: 10, marginTop: 4, paddingLeft: 2 }}>
+            Notes will be grouped by category in the notes view
+          </p>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex gap-2 pt-1">

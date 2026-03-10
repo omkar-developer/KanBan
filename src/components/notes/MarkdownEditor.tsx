@@ -1,0 +1,214 @@
+import { useState, useRef, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import "./MarkdownEditor.css";
+
+interface MarkdownEditorProps {
+  value: string;
+  onChange: (value: string) => void;
+  onWikiLinkClick?: (noteTitle: string) => void;
+  placeholder?: string;
+  readOnly?: boolean;
+}
+
+// Toolbar button configuration matching TaskEditor styling
+const toolbarItems = [
+  { label: "# ", title: "Heading", insert: "# ", wrap: false },
+  { label: "**B**", title: "Bold", insert: "****", wrap: true, cursor: 2 },
+  { label: "*I*", title: "Italic", insert: "**", wrap: true, cursor: 1 },
+  { label: "`c`", title: "Code", insert: "``", wrap: true, cursor: 1 },
+  { label: "[Link]()", title: "Link", insert: "[]()", wrap: false },
+  { label: "- [ ]", title: "Checkbox", insert: "- [ ] ", wrap: false },
+  { label: "- ", title: "List", insert: "- ", wrap: false },
+];
+
+export default function MarkdownEditor({
+  value,
+  onChange,
+  onWikiLinkClick,
+  placeholder = "Add your note… (Shift+Enter for new line, Enter to save)",
+  readOnly = false,
+}: MarkdownEditorProps) {
+  const [previewMode, setPreviewMode] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Render wiki-style links as clickable buttons in preview
+  const renderWikiLinks = useCallback((text: string) => {
+    const wikiLinkRegex = /\[\[([^\]]+)\]\]/g;
+    const parts = text.split(wikiLinkRegex);
+
+    return (
+      <>
+        {parts.map((part, idx) => {
+          if (idx % 2 === 0) {
+            return <span key={idx}>{part}</span>;
+          }
+          return (
+            <button
+              key={idx}
+              onClick={() => onWikiLinkClick?.(part.trim())}
+              className="wiki-link"
+              type="button"
+            >
+              [[{part}]]
+            </button>
+          );
+        })}
+      </>
+    );
+  }, [onWikiLinkClick]);
+
+  // Handle toolbar button clicks
+  const applyToolbar = useCallback((item: typeof toolbarItems[0]) => {
+    const el = textareaRef.current;
+    if (!el || readOnly) return;
+
+    const start = el.selectionStart ?? 0;
+    const end = el.selectionEnd ?? 0;
+    const sel = value.slice(start, end);
+
+    let newValue: string;
+    let cursor: number;
+
+    if (item.wrap && sel) {
+      const half = item.insert.length / 2;
+      newValue =
+        value.slice(0, start) +
+        item.insert.slice(0, half) +
+        sel +
+        item.insert.slice(half) +
+        value.slice(end);
+      cursor = start + half + sel.length + half;
+    } else if (item.wrap) {
+      newValue = value.slice(0, start) + item.insert + value.slice(end);
+      cursor = start + (item.cursor ?? Math.floor(item.insert.length / 2));
+    } else {
+      // Check if cursor is at start of line
+      const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+      const prefix =
+        lineStart === start || value.slice(lineStart, start).trim() === ""
+          ? ""
+          : "\n";
+      newValue =
+        value.slice(0, start) + prefix + item.insert + value.slice(end);
+      cursor = start + prefix.length + item.insert.length;
+    }
+
+    onChange(newValue);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(cursor, cursor);
+    });
+  }, [value, onChange, readOnly]);
+
+  // Handle keyboard shortcuts
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!readOnly && (e.ctrlKey || e.metaKey)) {
+      let handled = false;
+      
+      if (e.key === 'b' || e.key === 'B') {
+        e.preventDefault();
+        applyToolbar(toolbarItems.find(item => item.title === 'Bold')!);
+        handled = true;
+      } else if (e.key === 'i' || e.key === 'I') {
+        e.preventDefault();
+        applyToolbar(toolbarItems.find(item => item.title === 'Italic')!);
+        handled = true;
+      } else if (e.key === 'k' || e.key === 'K') {
+        e.preventDefault();
+        applyToolbar(toolbarItems.find(item => item.title === 'Link')!);
+        handled = true;
+      }
+      
+      if (handled) return;
+    }
+  }, [readOnly, applyToolbar]);
+
+  // Custom heading component for markdown to highlight wiki links
+  const HeadingComponent = (props: any) => {
+    const { children, level } = props;
+    const HeadTag = `h${level}` as any;
+    return (
+      <HeadTag className={`heading-${level}`}>
+        {renderWikiLinks(typeof children === "string" ? children : "")}
+      </HeadTag>
+    );
+  };
+
+  // Custom paragraph component
+  const ParagraphComponent = (props: any) => {
+    const { children } = props;
+    const text = typeof children === "string" ? children : "";
+    return <p>{renderWikiLinks(text)}</p>;
+  };
+
+  return (
+    <div className="markdown-editor">
+      {/* Toolbar */}
+      {!readOnly && !previewMode && (
+        <div className="editor-toolbar">
+          {toolbarItems.map((item) => (
+            <button
+              key={item.label}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                applyToolbar(item);
+              }}
+              title={item.title}
+              className="toolbar-button"
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Toggle preview/edit */}
+      {value && (
+        <div className="editor-controls">
+          <button
+            onClick={() => setPreviewMode(!previewMode)}
+            className="preview-toggle"
+          >
+            {previewMode ? "✏ Edit" : "👁 Preview"}
+          </button>
+        </div>
+      )}
+
+      {/* Editor or Preview */}
+      {previewMode ? (
+        <div className="markdown-preview">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              p: ParagraphComponent,
+              h1: HeadingComponent,
+              h2: HeadingComponent,
+              h3: HeadingComponent,
+              h4: HeadingComponent,
+              h5: HeadingComponent,
+              h6: HeadingComponent,
+            }}
+          >
+            {value || "*Nothing yet…*"}
+          </ReactMarkdown>
+        </div>
+      ) : (
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          className="editor-textarea"
+          readOnly={readOnly}
+          rows={12}
+        />
+      )}
+
+      <p className="editor-hint">
+        Markdown supported · Use [[Note Title]] for wiki links · Ctrl+B bold, Ctrl+I italic, Ctrl+K link
+      </p>
+    </div>
+  );
+}

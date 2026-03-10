@@ -14,7 +14,7 @@ export class KanbanDB extends Dexie {
   constructor() {
     super('kanbanDB');
     this.version(1).stores({
-      boards: 'id, createdAt',
+      boards: 'id, &createdAt, +type, +category',
       columns: 'id, boardId, order',
       tasks: 'id, columnId, order, createdAt',
       comments: 'id, taskId, createdAt',

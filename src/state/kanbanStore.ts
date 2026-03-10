@@ -10,7 +10,8 @@ interface KanbanState {
   boards:      Board[]
   columns:     Column[]
   tasks:       Task[]
-  activeBoard?: string
+  activeBoard?: Board
+  activeBoardId?: string
   activeTags:  string[] // Multi-select tag filter
   searchQuery: string // Global search query
   viewMode:    'board' | 'list' | 'grid' | 'archive' // Current view mode
@@ -32,7 +33,7 @@ interface KanbanState {
   // Archive toggle
   setShowArchived: (show: boolean) => void
 
-  createBoard: (name: string) => Promise<void>
+  createBoard: (name: string, type?: "kanban" | "notes" | "tools", category?: string) => Promise<void>
   createColumn:(boardId: string, name: string) => Promise<void>
   updateColumn:(column: Column) => Promise<void>
   deleteColumn:(columnId: string) => Promise<void>
@@ -83,16 +84,27 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
   }),
 
   async loadBoard(boardId) {
+    // Load board metadata from all boards
+    const allBoards = get().boards
+    const board = allBoards.find(b => b.id === boardId)
+    
     const columns = await store.getColumns(boardId)
     const sorted  = [...columns].sort((a, b) => a.order - b.order)
     const taskArrays = await Promise.all(sorted.map(c => store.getTasks(c.id)))
     const tasks = taskArrays.flat().sort((a, b) => a.order - b.order)
-    set({ activeBoard: boardId, columns: sorted, tasks })
+    
+    set({ activeBoard: board, activeBoardId: boardId, columns: sorted, tasks })
   },
 
-  async createBoard(name) {
+  async createBoard(name, type, category) {
     const id = createId()
-    await store.createBoard({ id, name, createdAt: Date.now() })
+    await store.createBoard({ 
+      id, 
+      name, 
+      type: type || "kanban", 
+      category: category || undefined, 
+      createdAt: Date.now() 
+    })
     await get().loadBoards()
   },
 

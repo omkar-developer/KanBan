@@ -1,5 +1,7 @@
 import { useKanbanStore } from "../../state/kanbanStore"
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
+import type { Board } from "../../models/Board"
+import ExplorerTree from "../ui/ExplorerTree"
 
 interface SidebarProps {
   onSelectBoard?: (boardId: string | null) => void
@@ -10,16 +12,37 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
   const createBoard = useKanbanStore(s => s.createBoard)
 
   const [newBoardName, setNewBoardName] = useState("")
+  
+  // Board creation modal state
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [modalType, setModalType] = useState<"kanban" | "notes" | "tools">("kanban")
+  const [modalCategory, setModalCategory] = useState("")
 
   const handleCreateBoard = async () => {
     if (!newBoardName.trim()) return
-    await createBoard(newBoardName.trim())
+    await createBoard(newBoardName.trim(), modalType || undefined, modalCategory || undefined)
     setNewBoardName("")
+    setShowCreateModal(false)
+    setModalType("kanban")
+    setModalCategory("")
   }
 
   const handleSelectBoard = (boardId: string) => {
     onSelectBoard?.(boardId)
   }
+
+  const handleAddToCategory = (category: string) => {
+    setShowCreateModal(true)
+    setModalType("kanban")
+    setModalCategory(category)
+  }
+
+  const modalRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (showCreateModal && modalRef.current) {
+      setTimeout(() => modalRef.current?.focus(), 50)
+    }
+  }, [showCreateModal])
 
   return (
     <div className="flex flex-col w-64 h-full" style={{ 
@@ -35,55 +58,56 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
       {/* New Board Section */}
       <div className="p-4" style={{ borderBottom: `1px solid var(--border)` }}>
         <label className="block text-xs mb-2" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>NEW BOARD</label>
-        <div className="flex flex-col gap-2">
-          <input
-            type="text"
-            value={newBoardName}
-            onChange={(e) => setNewBoardName(e.target.value)}
-            placeholder="Board name..."
-            className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all"
-            style={{
-              backgroundColor: 'var(--bg-input)',
-              borderColor: 'var(--border-input)',
-              color: 'var(--text-primary)',
-            }}
-            onKeyDown={(e) => e.key === "Enter" && handleCreateBoard()}
-          />
-          <button
-            onClick={handleCreateBoard}
-            disabled={!newBoardName.trim()}
-            className="w-full px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
-            style={{
-              backgroundColor: 'var(--accent)',
-              color: '#fff',
-            }}
-          >
-            Create
-          </button>
-        </div>
+        <button
+          onClick={() => {
+            setShowCreateModal(true)
+            setModalType("kanban")
+            setModalCategory("")
+          }}
+          className="w-full px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+          style={{
+            backgroundColor: 'var(--accent)',
+            color: '#fff',
+          }}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Create Board
+        </button>
       </div>
 
       {/* Board List */}
       <div className="flex-1 overflow-y-auto p-4">
         {boards.length > 0 ? (
-          <div className="space-y-1">
-            <label className="block text-xs mb-3" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>BOARDS</label>
-            {boards.map((board) => (
-              <button
-                key={board.id}
-                onClick={() => handleSelectBoard(board.id)}
-                className="w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors group"
-                style={{
-                  backgroundColor: 'var(--bg-input)',
-                  color: 'var(--text-primary)',
-                }}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500 group-hover:bg-blue-400"/>
-                  <span className="truncate">{board.name}</span>
-                </div>
-              </button>
-            ))}
+          <div className="space-y-3">
+            <label className="block text-xs mb-2" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>BOARDS</label>
+            
+            <ExplorerTree<Board>
+              items={boards.map(board => ({ ...board, category: board.category || "Uncategorized" }))}
+              groupKey="category"
+              onCreate={handleAddToCategory}
+              onItemSelect={(board) => handleSelectBoard(board.id)}
+              renderItem={(board) => (
+                <button
+                  key={board.id}
+                  onClick={() => handleSelectBoard(board.id)}
+                  className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors group"
+                  style={{
+                    backgroundColor: 'var(--bg-input)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: 'var(--accent)' }}
+                    />
+                    <span className="truncate">{board.name}</span>
+                  </div>
+                </button>
+              )}
+            />
           </div>
         ) : (
           <div className="text-center py-8">
@@ -103,6 +127,86 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
           <span>Settings</span>
         </button>
       </div>
+
+      {/* Board Creation Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] backdrop-blur-sm" onClick={() => setShowCreateModal(false)}>
+          <div 
+            className="rounded-xl p-6 w-[420px] shadow-2xl"
+            style={{ background: "var(--bg-modal, #161616)", border: "1px solid var(--border, rgba(255,255,255,0.06))" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">Create New Board</h2>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+                aria-label="Close modal"
+              >
+                <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Board Name */}
+              <div>
+                <label className="block text-zinc-500 text-sm mb-2 font-medium">Board Name</label>
+                <input
+                  ref={modalRef}
+                  type="text"
+                  value={newBoardName}
+                  onChange={(e) => setNewBoardName(e.target.value)}
+                  placeholder="Enter board name..."
+                  className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-4 py-3 text-zinc-200 placeholder-zinc-600 outline-none focus:border-white/25 focus:ring-1 focus:ring-white/10 transition-all"
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateBoard()}
+                />
+              </div>
+
+              {/* Board Type */}
+              <div>
+                <label className="block text-zinc-500 text-sm mb-2 font-medium">Type</label>
+                <div className="flex gap-2">
+                  {(["kanban", "notes", "tools"] as const).map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setModalType(type)}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        modalType === type
+                          ? 'bg-sky-600 text-white'
+                          : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08]'
+                      }`}
+                    >
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="block text-zinc-500 text-sm mb-2 font-medium">Category</label>
+                <input
+                  type="text"
+                  value={modalCategory}
+                  onChange={(e) => setModalCategory(e.target.value)}
+                  placeholder="Enter category (optional)..."
+                  className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-4 py-3 text-zinc-200 placeholder-zinc-600 outline-none focus:border-white/25 focus:ring-1 focus:ring-white/10 transition-all"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleCreateBoard}
+              disabled={!newBoardName.trim()}
+              className="w-full mt-6 bg-sky-600 hover:bg-sky-700 disabled:bg-zinc-700 disabled:text-zinc-500 text-white px-4 py-3 rounded-lg font-semibold transition-all"
+            >
+              Create Board
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

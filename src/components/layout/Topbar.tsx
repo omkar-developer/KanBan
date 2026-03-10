@@ -1,6 +1,7 @@
-import { useState } from "react"
+import { useState, useRef } from "react"
 import SettingsPanel from "../ui/SettingsPanel"
 import FilterPanel from "../ui/FilterPanel"
+import DropdownMenu from "../ui/DropdownMenu"
 import { useKanbanStore } from "../../state/kanbanStore"
 import { downloadBoardJSON, readFileAsText, parseExportJSON, createFileINPUT } from "../../utils/exportImport"
 import { store } from "../../storage/indexeddbStore"
@@ -18,6 +19,7 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
   const [filterOpen, setFilterOpen] = useState(false)
   const [searchInput, setSearchInput] = useState("")
   const [searchActive, setSearchActive] = useState(false)
+  const [importExportMenuOpen, setImportExportMenuOpen] = useState(false)
   
   const boards = useKanbanStore(s => s.boards)
   const columns = useKanbanStore(s => s.columns)
@@ -96,9 +98,10 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
   }
 
   const allTags = [...new Set(tasks.flatMap(t => t.tags || []))].filter(Boolean)
+  const importExportMenuRef = useRef<HTMLButtonElement>(null)
 
   return (
-    <div className="border-b flex items-center px-6 py-0 space-x-6" style={{ 
+    <div className="border-b flex items-center px-6 py-0 gap-4" style={{ 
       borderColor: 'var(--border)',
       backgroundColor: 'var(--bg-app)',
       height: '64px'
@@ -110,6 +113,39 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
 
       {/* Divider */}
       <div style={{ width: '1px', height: '32px', backgroundColor: 'var(--border)' }} />
+
+      {/* Search Input — now on left */}
+      <div className="relative flex items-center" style={{ width: '240px' }}>
+        <input
+          type="text"
+          placeholder="Search tasks..."
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          onFocus={() => setSearchActive(true)}
+          onBlur={() => setSearchActive(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              handleSearch()
+            }
+          }}
+          className="w-full px-3 pl-9 py-2 text-sm rounded-lg transition-all outline-none"
+          style={{
+            backgroundColor: 'var(--bg-popover)',
+            color: 'var(--text-primary)',
+            borderColor: searchActive ? 'var(--border-focus)' : 'var(--border)',
+            border: `1px solid ${searchActive ? 'var(--border-focus)' : 'var(--border)'}`,
+          }}
+        />
+        <svg
+          className="absolute left-3 w-4 h-4 pointer-events-none"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </div>
 
       {/* View Mode Buttons */}
       <div className="flex items-center gap-1" style={{
@@ -276,113 +312,6 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
       {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Search Input */}
-      <div className="relative flex items-center" style={{ width: '280px' }}>
-        <input
-          type="text"
-          placeholder="Search tasks..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          onFocus={() => setSearchActive(true)}
-          onBlur={() => setSearchActive(false)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              handleSearch()
-            }
-          }}
-          className="w-full px-3 pl-9 py-2 text-sm rounded-lg transition-all outline-none"
-          style={{
-            backgroundColor: 'var(--bg-popover)',
-            color: 'var(--text-primary)',
-            borderColor: searchActive ? 'var(--border-focus)' : 'var(--border)',
-            border: `1px solid ${searchActive ? 'var(--border-focus)' : 'var(--border)'}`,
-          }}
-        />
-        <svg
-          className="absolute left-3 w-4 h-4 pointer-events-none"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-      </div>
-
-      {/* Search Button */}
-      <button
-        onClick={handleSearch}
-        className="px-3 py-2 text-sm rounded transition-all"
-        style={{
-          backgroundColor: 'var(--bg-popover)',
-          color: 'var(--text-secondary)',
-          border: `1px solid var(--border)`,
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'var(--accent)'
-          e.currentTarget.style.color = '#fff'
-          e.currentTarget.style.borderColor = 'var(--accent)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'var(--bg-popover)'
-          e.currentTarget.style.color = 'var(--text-secondary)'
-          e.currentTarget.style.borderColor = 'var(--border)'
-        }}
-        title="Search"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-      </button>
-
-      {/* Export Button */}
-      <button
-        onClick={handleExport}
-        className="px-3 py-2 text-sm rounded transition-all"
-        style={{
-          backgroundColor: 'var(--bg-popover)',
-          color: 'var(--text-secondary)',
-          border: `1px solid var(--border)`,
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'var(--bg-card)'
-          e.currentTarget.style.borderColor = 'var(--border-hover)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'var(--bg-popover)'
-          e.currentTarget.style.borderColor = 'var(--border)'
-        }}
-        title="Export board as JSON"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-        </svg>
-      </button>
-
-      {/* Import Button */}
-      <button
-        onClick={handleImport}
-        className="px-3 py-2 text-sm rounded transition-all"
-        style={{
-          backgroundColor: 'var(--bg-popover)',
-          color: 'var(--text-secondary)',
-          border: `1px solid var(--border)`,
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = 'var(--bg-card)'
-          e.currentTarget.style.borderColor = 'var(--border-hover)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = 'var(--bg-popover)'
-          e.currentTarget.style.borderColor = 'var(--border)'
-        }}
-        title="Import board from JSON"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m7-7H5" />
-        </svg>
-      </button>
-
       {/* Settings Button */}
       <button
         onClick={handleSettingsClick}
@@ -406,6 +335,53 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       </button>
+
+      {/* Import/Export Menu Button (triple dot) */}
+      <button
+        ref={importExportMenuRef}
+        onClick={() => setImportExportMenuOpen(!importExportMenuOpen)}
+        className="p-2 rounded transition-all"
+        style={{
+          backgroundColor: importExportMenuOpen ? 'var(--bg-popover)' : 'transparent',
+          color: 'var(--text-secondary)',
+        }}
+        onMouseEnter={(e) => {
+          if (!importExportMenuOpen) {
+            e.currentTarget.style.backgroundColor = 'var(--bg-popover)'
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!importExportMenuOpen) {
+            e.currentTarget.style.backgroundColor = 'transparent'
+          }
+        }}
+        title="Import / Export"
+      >
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+          <circle cx="12" cy="5" r="2" />
+          <circle cx="12" cy="12" r="2" />
+          <circle cx="12" cy="19" r="2" />
+        </svg>
+      </button>
+
+      {/* Dropdown Menu for Import/Export */}
+      {importExportMenuOpen && (
+        <DropdownMenu
+          items={[
+            {
+              label: "Export Board",
+              onClick: handleExport,
+            },
+            {
+              label: "Import Board",
+              onClick: handleImport,
+            },
+          ]}
+          onClose={() => setImportExportMenuOpen(false)}
+          anchorRef={importExportMenuRef as React.RefObject<HTMLElement>}
+          align="right"
+        />
+      )}
 
       {/* Filter Panel */}
       <FilterPanel

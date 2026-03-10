@@ -85,6 +85,7 @@ export default function Column({ column, tasks, index }: Props) {
   const [icon,           setIcon]           = useState(() => column.icon  ?? getDefaultIcon(column.name))
   const [iconColor,      setIconColor]      = useState(() => column.color ?? COLOR_OPTIONS[0].value)
   const [collapsed,      setCollapsed]      = useState(() => column.hidden ?? false)
+  const [width,          setWidth]          = useState(() => column.width ?? 1)
   const [showIconPanel,  setShowIconPanel]  = useState(false)
   const [colorTab,       setColorTab]       = useState(false)
   const [showColumnMenu, setShowColumnMenu] = useState(false)
@@ -133,8 +134,8 @@ export default function Column({ column, tasks, index }: Props) {
   const colMenuBtnRef = useRef<HTMLButtonElement>(null)
   const iconPanelRef  = useRef<HTMLDivElement>(null)
 
-  const saveAppearance = (ic: string, color: string, hidden?: boolean) =>
-    updateColumn({ ...column, icon: ic, color, hidden: hidden ?? collapsed })
+  const saveAppearance = (ic: string, color: string, hidden?: boolean, w?: number) =>
+    updateColumn({ ...column, icon: ic, color, hidden: hidden ?? collapsed, width: w ?? width })
 
   const handleTitleDoubleClick = () => {
     setIsEditingTitle(true)
@@ -239,6 +240,12 @@ export default function Column({ column, tasks, index }: Props) {
       onClick: () => setFilterType(t)
     })),
     { separator: true } as const,
+    { label: "Column width", onClick: () => {}, disabled: true },
+    ...([1, 1.5, 2] as const).map(w => ({
+      label: `${width === w ? "✓ " : "  "}${w}x`,
+      onClick: () => { setWidth(w); saveAppearance(icon, iconColor, collapsed, w) }
+    })),
+    { separator: true } as const,
     {
       label: "Delete column", danger: true,
       icon: <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 4h10M5 4V2.5h4V4M5.5 6.5v4M8.5 6.5v4M3 4l.75 7.5h6.5L11 4" strokeLinecap="round" strokeLinejoin="round" /></svg>,
@@ -288,9 +295,10 @@ export default function Column({ column, tasks, index }: Props) {
         <div
           ref={colProvided.innerRef}
           {...colProvided.draggableProps}
-          className="flex-shrink-0 w-[300px] flex flex-col rounded-2xl"
+          className="flex-shrink-0 flex flex-col rounded-2xl transition-all"
           style={{
             ...colProvided.draggableProps.style,
+            width: `${300 * width}px`,
             background: `var(--bg-column, linear-gradient(180deg,#161616 0%,#111 100%))`,
             border: `1px solid var(--border, rgba(255,255,255,0.06))`,
             boxShadow: colSnapshot.isDragging
