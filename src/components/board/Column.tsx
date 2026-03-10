@@ -20,6 +20,7 @@ import type { Column as ColumnType } from "../../models/Column"
 import type { Task, TaskPriority, TaskType } from "../../models/Task"
 import { useKanbanStore } from "../../state/kanbanStore"
 import TaskCard from "./TaskCard"
+import TaskModal from "../task/TaskModal"
 import DropdownMenu from "../ui/DropdownMenu"
 
 // ── Icon registry ─────────────────────────────────────────────────────────
@@ -78,6 +79,7 @@ export default function Column({ column, tasks, index }: Props) {
   const updateColumn = useKanbanStore(s => s.updateColumn)
   const deleteColumn = useKanbanStore(s => s.deleteColumn)
   const createTask   = useKanbanStore(s => s.createTask)
+  const updateTask   = useKanbanStore(s => s.updateTask)
 
   const [icon,           setIcon]           = useState(() => column.icon  ?? getDefaultIcon(column.name))
   const [iconColor,      setIconColor]      = useState(() => column.color ?? COLOR_OPTIONS[0].value)
@@ -88,10 +90,17 @@ export default function Column({ column, tasks, index }: Props) {
   const [quickTitle,     setQuickTitle]     = useState("")
   const [quickFocused,   setQuickFocused]   = useState(false)
   const [panelPosition,  setPanelPosition]  = useState({ top: 0, left: 0 })
+
+  // Icon panel styling with CSS variables
+  const iconPanelStyle = {
+    background: 'var(--bg-popover, #1c1c1c)',
+    border: '1px solid var(--border, rgba(255,255,255,0.06))',
+  }
   const [sortKey,        setSortKey]        = useState<SortKey>("order")
   const [sortDir,        setSortDir]        = useState<SortDir>("asc")
   const [filterPriority, setFilterPriority] = useState<FilterP>("all")
   const [filterType,     setFilterType]     = useState<FilterT>("all")
+  const [newTask,        setNewTask]        = useState<Task | null>(null)
 
   const isFiltered = filterPriority !== "all" || filterType !== "all"
   const isSorted   = sortKey !== "order"
@@ -149,6 +158,19 @@ export default function Column({ column, tasks, index }: Props) {
     setQuickTitle("")
   }
 
+  const openNewTaskModal = () => {
+    const draft: Task = {
+      id: crypto.randomUUID(),
+      columnId: column.id,
+      title: "",
+      order: 0,
+      createdAt: Date.now(),
+      type: "task",
+      priority: "low",
+    }
+    setNewTask(draft)
+  }
+
   const sortItem = (key: SortKey, label: string) => ({
     label: `${sortKey === key ? (sortDir === "asc" ? "↑ " : "↓ ") : "  "}${label}`,
     onClick: () => {
@@ -204,8 +226,8 @@ export default function Column({ column, tasks, index }: Props) {
             className="flex-shrink-0 flex flex-col items-center py-5 px-3 gap-3 rounded-2xl cursor-pointer transition hover:bg-white/[0.03]"
             style={{
               ...provided.draggableProps.style,
-              border: "1px solid rgba(255,255,255,0.06)",
-              background: "#111",
+              border: `1px solid var(--border, rgba(255,255,255,0.06))`,
+              background: `var(--bg-column-solid, #121212)`,
               width: 52,
             }}
             title={`Expand "${column.name}"`}
@@ -215,7 +237,7 @@ export default function Column({ column, tasks, index }: Props) {
               style={{ writingMode: "vertical-rl", fontFamily: "'DM Sans', sans-serif", transform: "rotate(180deg)" }}>
               {column.name}
             </span>
-            <span className="text-[10px] text-zinc-700 bg-white/[0.04] border border-white/[0.06] px-1.5 py-0.5 rounded-full">
+            <span className="text-[10px] text-[var(--text-muted,#666670)] bg-white/[0.04] border border-[var(--border,rgba(255,255,255,0.06))] px-1.5 py-0.5 rounded-full">
               {tasks.length}
             </span>
           </div>
@@ -226,6 +248,7 @@ export default function Column({ column, tasks, index }: Props) {
 
   // ── Full column ───────────────────────────────────────────────────────────
   return (
+  <>
     <Draggable draggableId={column.id} index={index}>
       {(colProvided: DraggableProvided, colSnapshot: DraggableStateSnapshot) => (
         <div
@@ -234,8 +257,8 @@ export default function Column({ column, tasks, index }: Props) {
           className="flex-shrink-0 w-[300px] flex flex-col rounded-2xl"
           style={{
             ...colProvided.draggableProps.style,
-            background: "linear-gradient(180deg,#161616 0%,#111 100%)",
-            border: "1px solid rgba(255,255,255,0.06)",
+            background: `var(--bg-column, linear-gradient(180deg,#161616 0%,#111 100%))`,
+            border: `1px solid var(--border, rgba(255,255,255,0.06))`,
             boxShadow: colSnapshot.isDragging
               ? "0 24px 48px rgba(0,0,0,0.7)"
               : "0 8px 32px rgba(0,0,0,0.4)",
@@ -244,6 +267,7 @@ export default function Column({ column, tasks, index }: Props) {
         >
           {/* Header — drag handle for column reordering ONLY */}
           <div
+            /* drag handle is ONLY the header */
             {...colProvided.dragHandleProps}
             className="px-4 pt-4 pb-3 cursor-grab active:cursor-grabbing select-none"
           >
@@ -264,13 +288,13 @@ export default function Column({ column, tasks, index }: Props) {
                   <div
                     ref={iconPanelRef}
                     className="rounded-xl border border-white/[0.09] shadow-2xl p-3"
-                    style={{ position: "fixed", zIndex: 99999, background: "#1c1c1c", width: 280, top: panelPosition.top, left: panelPosition.left }}
+                    style={{ position: "fixed", zIndex: 99999, background: "var(--bg-popover, #1c1c1c)", width: 280, top: panelPosition.top, left: panelPosition.left }}
                     onPointerDown={e => e.stopPropagation()}
                   >
                     <div className="flex gap-1 mb-3">
                       {(["Icon","Color"] as const).map(tab => (
                         <button key={tab} onPointerDown={e => e.stopPropagation()} onClick={() => setColorTab(tab === "Color")}
-                          className={`flex-1 text-[11px] font-semibold py-1.5 rounded-lg transition ${colorTab === (tab === "Color") ? "bg-white/[0.08] text-zinc-200" : "text-zinc-600 hover:text-zinc-400"}`}>
+                          className={`flex-1 text-[11px] font-semibold py-1.5 rounded-lg transition ${colorTab === (tab === "Color") ? "bg-white/[0.08] text-[var(--text-primary,#f0f0f0)]" : "text-[var(--text-muted,#666670)] hover:text-[var(--text-secondary,#a8a8b0)]"}`}>
                           {tab}
                         </button>
                       ))}
@@ -291,7 +315,7 @@ export default function Column({ column, tasks, index }: Props) {
                         {COLOR_OPTIONS.map(c => (
                           <button key={c.value} onPointerDown={e => e.stopPropagation()}
                             onClick={() => { setIconColor(c.value); saveAppearance(icon, c.value); setShowIconPanel(false) }}
-                            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition hover:bg-white/[0.06] ${iconColor === c.value ? "bg-white/[0.08] text-zinc-200" : "text-zinc-500"}`}>
+                            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition hover:bg-white/[0.06] ${iconColor === c.value ? "bg-white/[0.08] text-[var(--text-primary,#f0f0f0)]" : "text-[var(--text-secondary,#a8a8b0)]"}`}>
                             <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: c.value }} />
                             {c.label}
                           </button>
@@ -302,26 +326,26 @@ export default function Column({ column, tasks, index }: Props) {
                   document.body
                 )}
 
-                <h3 className="font-semibold text-zinc-100 text-sm tracking-tight truncate" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                <h3 className="font-semibold text-[var(--text-primary,#f0f0f0)] text-sm tracking-tight truncate" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                   {column.name}
                 </h3>
               </div>
 
               <div className="flex items-center gap-1 flex-shrink-0" onPointerDown={e => e.stopPropagation()}>
-                <span className="text-[11px] font-semibold text-zinc-500 bg-white/[0.05] border border-white/[0.07] px-2 py-0.5 rounded-full" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+                <span className="text-[11px] font-semibold text-[var(--text-secondary,#a8a8b0)] bg-white/[0.05] border border-[var(--border,rgba(255,255,255,0.06))] px-2 py-0.5 rounded-full" style={{ fontFamily: "'DM Sans', sans-serif" }}>
                   {tasks.length}{isFiltered && <span className="ml-0.5 text-amber-500">*</span>}
                 </span>
                 <button
                   onPointerDown={e => e.stopPropagation()}
-                  onClick={() => createTask(column.id, "New Task")}
-                  className="w-6 h-6 flex items-center justify-center rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition" title="New task">
+                  onClick={openNewTaskModal}
+                  className="w-6 h-6 flex items-center justify-center rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition" title="New task (full editor)">
                   <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 2v10M2 7h10" strokeLinecap="round" /></svg>
                 </button>
                 <button
                   ref={colMenuBtnRef}
                   onPointerDown={e => e.stopPropagation()}
                   onClick={() => setShowColumnMenu(v => !v)}
-                  className={`w-6 h-6 flex items-center justify-center rounded-lg transition ${showColumnMenu || isFiltered || isSorted ? "text-zinc-300 bg-white/[0.06]" : "text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06]"}`}>
+                  className={`w-6 h-6 flex items-center justify-center rounded-lg transition ${showColumnMenu || isFiltered || isSorted ? "text-[var(--text-primary,#f0f0f0)] bg-white/[0.06]" : "text-[var(--text-muted,#666670)] hover:text-[var(--text-primary,#f0f0f0)] hover:bg-white/[0.06]"}`}>
                   <svg className="w-3 h-3" viewBox="0 0 4 14" fill="currentColor">
                     <circle cx="2" cy="2"  r="1.5" />
                     <circle cx="2" cy="7"  r="1.5" />
@@ -341,11 +365,11 @@ export default function Column({ column, tasks, index }: Props) {
 
             {(isFiltered || isSorted) && (
               <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
-                {isSorted && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/[0.05] text-zinc-500 border border-white/[0.07]">{sortKey} {sortDir === "asc" ? "↑" : "↓"}</span>}
+                {isSorted && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/[0.05] text-[var(--text-secondary,#a8a8b0)] border border-[var(--border,rgba(255,255,255,0.06))]">{sortKey} {sortDir === "asc" ? "↑" : "↓"}</span>}
                 {filterPriority !== "all" && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-500/80 border border-amber-500/20">{filterPriority}</span>}
                 {filterType     !== "all" && <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-500/80 border border-sky-500/20">{filterType}</span>}
                 <button onClick={() => { setFilterPriority("all"); setFilterType("all"); setSortKey("order"); setSortDir("asc") }}
-                  className="text-[10px] text-zinc-700 hover:text-zinc-400 transition ml-auto">Clear ✕</button>
+                  className="text-[10px] text-[var(--text-muted,#666670)] hover:text-[var(--text-secondary,#a8a8b0)] transition ml-auto">Clear ✕</button>
               </div>
             )}
 
@@ -374,7 +398,15 @@ export default function Column({ column, tasks, index }: Props) {
                           {...taskProvided.dragHandleProps}
                           style={{
                             ...taskProvided.draggableProps.style,
-                            opacity: taskSnapshot.isDragging ? 0.85 : 1,
+                            opacity:   taskSnapshot.isDragging ? 1 : 1,
+                            transform: taskSnapshot.isDragging
+                              ? `${taskProvided.draggableProps.style?.transform ?? ""} rotate(1.5deg) scale(1.02)`
+                              : taskProvided.draggableProps.style?.transform,
+                            boxShadow: taskSnapshot.isDragging
+                              ? "0 20px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.08)"
+                              : undefined,
+                            borderRadius: 12,
+                            zIndex: taskSnapshot.isDragging ? 9999 : undefined,
                           }}
                         >
                           <TaskCard task={task} />
@@ -384,10 +416,10 @@ export default function Column({ column, tasks, index }: Props) {
                   ))
                 ) : (
                   <div className={`flex flex-col items-center justify-center py-12 gap-2 rounded-xl border-2 border-dashed transition-colors ${snapshot.isDraggingOver ? "border-white/20" : "border-white/[0.06]"}`}>
-                    <div className="w-9 h-9 rounded-full bg-white/[0.03] border border-white/[0.05] flex items-center justify-center">
-                      <svg className="w-4 h-4 text-zinc-700" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M7 2v10M2 7h10" strokeLinecap="round" /></svg>
+                    <div className="w-9 h-9 rounded-full bg-white/[0.03] border border-[var(--border,rgba(255,255,255,0.06))] flex items-center justify-center">
+                      <svg className="w-4 h-4 text-[var(--text-muted,#666670)]" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M7 2v10M2 7h10" strokeLinecap="round" /></svg>
                     </div>
-                    <p className="text-[11px] text-zinc-700 font-medium" style={{ fontFamily: "'DM Sans', sans-serif" }}>Drop here</p>
+                    <p className="text-[11px] text-[var(--text-muted,#666670)] font-medium" style={{ fontFamily: "'DM Sans', sans-serif" }}>Drop here</p>
                   </div>
                 )}
                 {provided.placeholder}
@@ -409,20 +441,24 @@ export default function Column({ column, tasks, index }: Props) {
                   }}
                   onBlur={() => { if (!quickTitle.trim()) setQuickFocused(false) }}
                   placeholder="Quick task title…"
-                  className="w-full bg-transparent text-sm text-zinc-200 placeholder-zinc-600 px-3 py-2.5 outline-none caret-zinc-400"
+                  className="w-full bg-transparent text-sm text-[var(--text-primary,#f0f0f0)] placeholder-[var(--text-muted,#666670)] px-3 py-2.5 outline-none caret-zinc-400"
                   style={{ fontFamily: "'DM Sans', sans-serif" }}
                 />
                 <div className="flex items-center gap-1.5 px-3 pb-2.5">
                   <button onMouseDown={e => { e.preventDefault(); submitQuick() }}
-                    className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white/[0.08] text-zinc-300 hover:bg-white/[0.13] hover:text-white transition">Add</button>
+                    className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-white/[0.08] text-[var(--text-primary,#f0f0f0)] hover:bg-white/[0.13] hover:text-white transition">Add</button>
                   <button onMouseDown={e => { e.preventDefault(); setQuickTitle(""); setQuickFocused(false) }}
-                    className="text-[11px] font-medium px-2 py-1 rounded-lg text-zinc-600 hover:text-zinc-400 transition">Cancel</button>
+                    className="text-[11px] font-medium px-2 py-1 rounded-lg text-[var(--text-muted,#666670)] hover:text-[var(--text-secondary,#a8a8b0)] transition">Cancel</button>
+                  <button onMouseDown={e => { e.preventDefault(); setQuickFocused(false); setQuickTitle(""); openNewTaskModal() }}
+                    className="ml-auto text-[11px] font-medium px-2 py-1 rounded-lg text-[var(--text-muted,#666670)] hover:text-sky-400 transition">
+                    Full editor ↗
+                  </button>
                 </div>
               </div>
             ) : (
               <button
                 onClick={() => { setQuickFocused(true); setTimeout(() => quickInputRef.current?.focus(), 50) }}
-                className="w-full flex items-center gap-2 py-2 px-2.5 rounded-xl text-[12px] font-medium text-zinc-700 hover:text-zinc-400 hover:bg-white/[0.04] transition-all"
+                className="w-full flex items-center gap-2 py-2 px-2.5 rounded-xl text-[12px] font-medium text-[var(--text-muted,#666670)] hover:text-[var(--text-secondary,#a8a8b0)] hover:bg-white/[0.04] transition-all"
                 style={{ fontFamily: "'DM Sans', sans-serif" }}
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.75"><path d="M7 2v10M2 7h10" strokeLinecap="round" /></svg>
@@ -433,5 +469,23 @@ export default function Column({ column, tasks, index }: Props) {
         </div>
       )}
     </Draggable>
+
+    {/* New task modal — portalled outside column stacking context */}
+    {newTask && createPortal(
+      <TaskModal
+        task={newTask}
+        isOpen={true}
+        onClose={() => setNewTask(null)}
+        onSave={async (_id, updates) => {
+          if (!updates.title?.trim()) return
+          await createTask(column.id, updates.title, updates)
+          setNewTask(null)
+        }}
+        onDelete={async () => setNewTask(null)}
+        isCreating
+      />,
+      document.body
+    )}
+  </>
   )
 }

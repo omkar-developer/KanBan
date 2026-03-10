@@ -13,7 +13,7 @@ export default function DragOverlayCard({ task }: Props) {
   return (
     <div
       className="relative rounded-xl overflow-hidden border border-white/[0.15] shadow-2xl"
-      style={{ background: "#1e1e1e", width: 280, rotate: "1.5deg", opacity: 0.95 }}
+      style={{ background: "var(--bg-card, #141414)", width: 280, rotate: "1.5deg", opacity: 0.95 }}
     >
       {task.priority && task.priority !== "low" && (
         <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${accent}`} />

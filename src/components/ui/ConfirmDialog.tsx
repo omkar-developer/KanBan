@@ -42,7 +42,7 @@ export default function ConfirmDialog({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
-      <p className="text-zinc-300 mb-6">{message}</p>
+      <p className="text-[var(--text-primary,#f0f0f0)] mb-6">{message}</p>
       <div className="flex gap-3">
         <button
           ref={buttonRef}
@@ -59,7 +59,7 @@ export default function ConfirmDialog({
         <button
           onClick={onClose}
           disabled={isConfirming}
-          className="flex-1 px-4 py-3 border border-zinc-700 text-zinc-300 hover:bg-zinc-800 rounded-lg font-semibold transition-all disabled:opacity-50"
+          className="flex-1 px-4 py-3 border border-[var(--border,rgba(255,255,255,0.06))] text-[var(--text-secondary,#a8a8b0)] hover:bg-white/[0.06] rounded-lg font-semibold transition-all disabled:opacity-50"
         >
           {cancelText}
         </button>

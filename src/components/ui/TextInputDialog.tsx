@@ -60,7 +60,7 @@ export default function TextInputDialog({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
       <div className="mb-6">
-        <label className="block text-zinc-400 text-sm mb-2">{label}</label>
+        <label className="block text-zinc-500 text-sm mb-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>{label}</label>
         <input
           ref={inputRef}
           type="text"
@@ -68,7 +68,7 @@ export default function TextInputDialog({
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+          className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-4 py-3 text-zinc-200 placeholder-zinc-600 outline-none focus:border-white/25 focus:ring-1 focus:ring-white/10 transition-all"
         />
       </div>
       <button

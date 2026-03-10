@@ -18,7 +18,7 @@ export default function MainLayout({ children, boardName, onBoardChange, onSetti
   }, [loadBoards])
 
   return (
-    <div className="flex h-screen bg-zinc-950">
+    <div className="flex h-screen" style={{ backgroundColor: 'var(--bg-app)' }}>
       {/* Sidebar */}
       <Sidebar onSelectBoard={onBoardChange} />
 
@@ -27,7 +27,7 @@ export default function MainLayout({ children, boardName, onBoardChange, onSetti
         {boardName && <TopBar boardName={boardName} onSettingsClick={onSettingsClick} />}
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto bg-zinc-950">
+        <main className="flex-1 overflow-auto" style={{ backgroundColor: 'var(--bg-app)' }}>
           {children}
         </main>
       </div>

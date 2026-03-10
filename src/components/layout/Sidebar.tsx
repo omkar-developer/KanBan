@@ -22,29 +22,41 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
   }
 
   return (
-    <div className="flex flex-col w-64 bg-zinc-900 border-r border-zinc-800 h-full">
+    <div className="flex flex-col w-64 h-full" style={{ 
+      backgroundColor: 'var(--bg-app)',
+      borderRightColor: 'var(--border)'
+    }}>
       {/* Header */}
-      <div className="p-6 border-b border-zinc-800">
-        <h1 className="font-bold text-xl text-white">KanBan</h1>
-        <p className="text-xs text-zinc-400 mt-1">Task Management</p>
+      <div className="p-6" style={{ borderBottom: `1px solid var(--border)` }}>
+        <h1 className="font-bold text-xl">KanBan</h1>
+        <p className="text-xs mt-1">Task Management</p>
       </div>
 
       {/* New Board Section */}
-      <div className="p-4 border-b border-zinc-800">
-        <label className="block text-xs font-semibold text-zinc-400 mb-2">NEW BOARD</label>
+      <div className="p-4" style={{ borderBottom: `1px solid var(--border)` }}>
+        <label className="block text-xs mb-2" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>NEW BOARD</label>
         <div className="flex flex-col gap-2">
           <input
             type="text"
             value={newBoardName}
             onChange={(e) => setNewBoardName(e.target.value)}
             placeholder="Board name..."
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+            className="w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all"
+            style={{
+              backgroundColor: 'var(--bg-input)',
+              borderColor: 'var(--border-input)',
+              color: 'var(--text-primary)',
+            }}
             onKeyDown={(e) => e.key === "Enter" && handleCreateBoard()}
           />
           <button
             onClick={handleCreateBoard}
             disabled={!newBoardName.trim()}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-700 disabled:text-zinc-500 text-white px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
+            className="w-full px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
+            style={{
+              backgroundColor: 'var(--accent)',
+              color: '#fff',
+            }}
           >
             Create
           </button>
@@ -55,12 +67,16 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
       <div className="flex-1 overflow-y-auto p-4">
         {boards.length > 0 ? (
           <div className="space-y-1">
-            <label className="block text-xs font-semibold text-zinc-400 mb-3">BOARDS</label>
+            <label className="block text-xs mb-3" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>BOARDS</label>
             {boards.map((board) => (
               <button
                 key={board.id}
                 onClick={() => handleSelectBoard(board.id)}
-                className="w-full text-left px-4 py-3 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white text-sm font-medium transition-colors group"
+                className="w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors group"
+                style={{
+                  backgroundColor: 'var(--bg-input)',
+                  color: 'var(--text-primary)',
+                }}
               >
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-blue-500 group-hover:bg-blue-400"/>

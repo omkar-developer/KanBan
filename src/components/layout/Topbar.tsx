@@ -1,11 +1,24 @@
+import { useState } from "react"
+import SettingsPanel from "../ui/SettingsPanel"
+
 interface TopBarProps {
   boardName?: string
   onSettingsClick?: () => void
 }
 
 export default function TopBar({ boardName = "Kanban", onSettingsClick }: TopBarProps) {
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  
+  // If onSettingsClick is provided, use it; otherwise just toggle local state
+  const handleSettingsClick = onSettingsClick ? () => {
+    onSettingsClick()
+    setSettingsOpen(true)
+  } : () => setSettingsOpen(true)
   return (
-    <div className="h-16 border-b border-zinc-800 bg-zinc-900 flex items-center px-8 justify-between">
+    <div className="h-16 flex items-center px-8 justify-between" style={{ 
+      borderBottom: `1px solid var(--border)`,
+      backgroundColor: 'var(--bg-app)'
+    }}>
       <div className="flex items-center gap-4">
         {/* Board Icon and Name */}
         <div className="flex items-center gap-3">
@@ -22,7 +35,11 @@ export default function TopBar({ boardName = "Kanban", onSettingsClick }: TopBar
       <div className="flex items-center gap-3">
         {/* Priority Toggle */}
         <button
-          className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors"
+          className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors"
+          style={{ 
+            color: 'var(--text-secondary)',
+            backgroundColor: 'var(--bg-popover)',
+          }}
           title="Toggle priority view"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -33,7 +50,7 @@ export default function TopBar({ boardName = "Kanban", onSettingsClick }: TopBar
 
         {/* Settings Button */}
         <button
-          onClick={onSettingsClick}
+          onClick={handleSettingsClick}
           className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
           title="Settings"
         >
@@ -48,6 +65,9 @@ export default function TopBar({ boardName = "Kanban", onSettingsClick }: TopBar
           K
         </div>
       </div>
+
+      {/* Settings Panel */}
+      <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   )
 }

@@ -51,7 +51,8 @@ export default function Modal({ isOpen, onClose, children, title }: ModalProps) 
     >
       <div
         ref={modalRef}
-        className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 w-[420px] shadow-2xl"
+        className="rounded-xl p-6 w-[420px] shadow-2xl"
+        style={{ background: "var(--bg-modal, #161616)", border: "1px solid var(--border, rgba(255,255,255,0.06))" }}
         onClick={(e) => e.stopPropagation()}
       >
         {title && (

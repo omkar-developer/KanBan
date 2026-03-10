@@ -20,9 +20,11 @@ interface KanbanState {
   updateColumn:(column: Column) => Promise<void>
   deleteColumn:(columnId: string) => Promise<void>
 
-  createTask:  (columnId: string, title: string) => Promise<void>
+  createTask:  (columnId: string, title: string, extra?: Partial<Task>) => Promise<void>
   updateTask:  (taskId: string, updates: Partial<Task>) => Promise<void>
   deleteTask:  (taskId: string) => Promise<void>
+  archiveTask: (taskId: string) => Promise<void>
+  unarchiveTask:(taskId: string, columnId: string) => Promise<void>
 
   reorderTasksOptimistic: (taskId: string, toColumnId: string, toIndex: number) => void
   persistTaskOrder:       (columnIds: string[]) => Promise<void>
@@ -79,13 +81,13 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
     }))
   },
 
-  async createTask(columnId, title) {
+  async createTask(columnId, title, extra) {
     const id = createId()
     const existing = get().tasks.filter(t => t.columnId === columnId)
     const order = existing.length > 0
       ? Math.max(...existing.map(t => t.order)) + 1000
       : 1000
-    const task: Task = { id, columnId, title, order, createdAt: Date.now() }
+    const task: Task = { id, columnId, title, order, createdAt: Date.now(), ...(extra ?? {}) }
     await store.createTask(task)
     set(s => ({ tasks: [...s.tasks, task] }))
   },
@@ -101,6 +103,25 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
   async deleteTask(taskId) {
     await store.deleteTask(taskId)
     set(s => ({ tasks: s.tasks.filter(t => t.id !== taskId) }))
+  },
+
+  // Archive = soft-delete: task stays in DB/state, flagged as archived
+  // Archived tasks are hidden from normal columns but retrievable
+  async archiveTask(taskId) {
+    const task = get().tasks.find(t => t.id === taskId)
+    if (!task) return
+    const archived = { ...task, data: { ...task.data, archived: true, archivedAt: Date.now() }, updatedAt: Date.now() }
+    await store.updateTask(archived)
+    set(s => ({ tasks: s.tasks.map(t => t.id === taskId ? archived : t) }))
+  },
+
+  async unarchiveTask(taskId, columnId) {
+    const task = get().tasks.find(t => t.id === taskId)
+    if (!task) return
+    const { archived, archivedAt, ...restData } = (task.data ?? {}) as Record<string, unknown> & { archived?: boolean; archivedAt?: number }
+    const restored = { ...task, columnId, data: restData, updatedAt: Date.now() }
+    await store.updateTask(restored)
+    set(s => ({ tasks: s.tasks.map(t => t.id === taskId ? restored : t) }))
   },
 
   // Called from BoardView.onDragEnd — updates Zustand state only (no DB write).

@@ -10,12 +10,12 @@ export default function DragOverlayColumn({ column, taskCount }: Props) {
   return (
     <div
       className="rounded-2xl border border-white/[0.15] shadow-2xl overflow-hidden"
-      style={{ background: "#181818", width: 300, rotate: "1deg", opacity: 0.92 }}
+      style={{ background: "var(--bg-column-solid, #121212)", width: 300, rotate: "1deg", opacity: 0.92 }}
     >
       <div className="px-4 pt-4 pb-3">
         <div className="flex items-center gap-2.5 justify-between">
           <div className="flex items-center gap-2">
-            <Circle width={15} height={15} style={{ color: column.color ?? "#71717a" }} strokeWidth={1.75} />
+            <Circle width={15} height={15} style={{ color: column.color ?? "var(--bg-card, #141414)" }} strokeWidth={1.75} />
             <span className="font-semibold text-zinc-100 text-sm" style={{ fontFamily: "'DM Sans', sans-serif" }}>
               {column.name}
             </span>
