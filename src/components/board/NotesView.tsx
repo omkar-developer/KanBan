@@ -772,6 +772,95 @@ export default function NotesView() {
     setIsDirty(false)
   }, [selectedNoteId, noteContent, noteTags])
 
+  const handleExportPdf = useCallback(async () => {
+    if (!selectedNote) return
+    try {
+      // Create a print-friendly window
+      const printWindow = window.open('', '_blank')
+      if (!printWindow) {
+        alert('Please allow popups to export PDF')
+        return
+      }
+
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>${selectedNote.title} - TaskFlow</title>
+          <style>
+            @media print {
+              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            }
+            body {
+              font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+              line-height: 1.6;
+              color: #1a1a1a;
+              max-width: 800px;
+              margin: 40px auto;
+              padding: 20px;
+            }
+            h1 { font-size: 28px; margin-bottom: 8px; }
+            .meta { color: #666; font-size: 12px; margin-bottom: 24px; }
+            h1, h2, h3, h4, h5, h6 { margin-top: 24px; margin-bottom: 12px; }
+            p { margin: 12px 0; }
+            code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: 'JetBrains Mono', monospace; font-size: 0.9em; }
+            pre { background: #1a1a1a; color: #f8f8f2; padding: 16px; border-radius: 6px; overflow-x: auto; }
+            pre code { background: none; padding: 0; }
+            blockquote { border-left: 3px solid #ddd; padding-left: 16px; margin: 16px 0; color: #666; }
+            ul, ol { padding-left: 24px; margin: 12px 0; }
+            li { margin: 6px 0; }
+            a { color: #3b82f6; text-decoration: underline; }
+            hr { border: none; border-top: 1px solid #ddd; margin: 24px 0; }
+            table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+            th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+            th { background: #f5f5f5; }
+          </style>
+        </head>
+        <body>
+          <h1>${selectedNote.title}</h1>
+          <div class="meta">
+            ${selectedNote.data?.category ? `<span>Category: ${selectedNote.data.category}</span> · ` : ''}
+            <span>Created: ${new Date(selectedNote.createdAt).toLocaleDateString()}</span>
+            ${noteTags.length > 0 ? ` · Tags: ${noteTags.join(', ')}` : ''}
+          </div>
+          <div id="content"></div>
+        </body>
+        </html>
+      `
+
+      printWindow.document.write(htmlContent)
+      printWindow.document.close()
+
+      // Wait for content to render, then convert markdown to HTML
+      setTimeout(() => {
+        const contentDiv = printWindow.document.getElementById('content')
+        if (contentDiv) {
+          // Simple markdown to HTML conversion
+          let html = noteContent
+            .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+            .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+            .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+            .replace(/^#### (.*$)/gim, '<h4>$1</h4>')
+            .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+            .replace(/\*(.*)\*/gim, '<em>$1</em>')
+            .replace(/`([^`]+)`/gim, '<code>$1</code>')
+            .replace(/\n- (.*$)/gim, '<li>$1</li>')
+            .replace(/\n\d+\. (.*$)/gim, '<li>$1</li>')
+            .replace(/\n\n/gim, '</p><p>')
+          
+          contentDiv.innerHTML = `<div>${html}</div>`
+        }
+        
+        // Trigger print dialog
+        printWindow.focus()
+        printWindow.print()
+      }, 500)
+    } catch (err) {
+      console.error('Export failed:', err)
+      alert('Failed to export PDF')
+    }
+  }, [selectedNote, noteContent, noteTags])
+
   const handleWikiLinkClick = useCallback((title: string) => {
     const found = noteTasks.find(t => t.title.toLowerCase() === title.toLowerCase())
     if (found) setSelectedNoteId(found.id)
@@ -1160,6 +1249,14 @@ export default function NotesView() {
                       ))}
                     </div>
 
+                    {/* Export PDF */}
+                    <HeaderBtn title="Export as PDF" onClick={handleExportPdf}>
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 14 14">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                          d="M12 10v6H2V4h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V10zM9 4v5h5" />
+                      </svg>
+                    </HeaderBtn>
+
                     {/* Doc / A4 width toggle */}
                     <HeaderBtn
                       title={docWidthMode ? "Full width" : "Doc width — A4 centered (⌘⇧D)"}
@@ -1282,18 +1379,18 @@ export default function NotesView() {
               </div>
 
               {/* ── Editor / Preview panes ─────────────────────────────────── */}
-              <div style={{ flex: 1, minHeight: 0, display: "flex", overflow: "hidden" }}>
+              <div style={{ flex: 1, minHeight: 0, display: "flex", overflow: "hidden", position: "relative" }}>
 
                 {/* Edit pane */}
                 {(viewMode === "edit" || viewMode === "split") && (
                   <div style={{
                     flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0,
                     borderRight: viewMode === "split" ? "1px solid var(--border)" : "none",
-                    overflow: "hidden",
+                    overflow: "hidden", position: "relative",
                   }}>
                     {docWidthMode ? (
                       // Doc-width: scrollable wrapper with centered max-width column
-                      <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+                      <div style={{ flex: 1, overflowY: "auto", minHeight: 0, position: "relative" }}>
                         <div style={{ maxWidth: 760, margin: "0 auto", minHeight: "100%", display: "flex", flexDirection: "column" }}>
                           <textarea
                             ref={textareaRef}

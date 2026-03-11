@@ -16,6 +16,10 @@
     "@formkit/drag-and-drop": "^0.5.3",
     "@hello-pangea/dnd": "^18.0.1",
     "@tailwindcss/vite": "^4.2.1",
+    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-dialog": "^2.6.0",
+    "@tauri-apps/plugin-fs": "^2.4.5",
+    "@tauri-apps/plugin-sql": "^2.3.2",
     "dexie": "^4.3.0",
     "lucide-react": "^0.577.0",
     "mermaid": "^11.13.0",
@@ -29,6 +33,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@tauri-apps/cli": "^2.10.1",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",

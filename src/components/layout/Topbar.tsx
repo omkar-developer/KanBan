@@ -2,11 +2,25 @@ import { useState, useRef, useEffect } from "react"
 import SettingsPanel from "../ui/SettingsPanel"
 import FilterPanel from "../ui/FilterPanel"
 import DropdownMenu from "../ui/DropdownMenu"
+import ConfirmDialog from "../ui/ConfirmDialog"
 import { useKanbanStore } from "../../state/kanbanStore"
-import { downloadBoardJSON, readFileAsText, parseExportJSON, createFileINPUT } from "../../utils/exportImport"
-import { store } from "../../storage/indexeddbStore"
+import {
+  downloadBoardJSON,
+  readFileAsText,
+  parseExportJSON,
+  createFileINPUT,
+  downloadDatabaseBackup,
+  parseDatabaseBackup,
+  openFileInTauri,
+  isTauri,
+  type DatabaseBackup,
+} from "../../utils/exportImport"
+import { store } from "../../storage/storage"
+import { db } from "../../storage/db"
 import type { Column } from "../../models/Column"
 import type { Task } from "../../models/Task"
+import type { Board } from "../../models/Board"
+import type { Comment } from "../../models/Comment"
 
 interface TopBarProps {
   boardName?: string
@@ -156,6 +170,8 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
   const [searchExpanded,      setSearchExpanded]      = useState(false)
   const [searchInput,         setSearchInput]         = useState("")
   const [importExportMenuOpen, setImportExportMenuOpen] = useState(false)
+  const [showRestoreDialog,   setShowRestoreDialog]   = useState(false)
+  const [pendingBackupData,   setPendingBackupData]   = useState<DatabaseBackup | null>(null)
 
   const boards       = useKanbanStore(s => s.boards)
   const columns      = useKanbanStore(s => s.columns)
@@ -169,6 +185,8 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
   const setSearchQuery  = useKanbanStore(s => s.setSearchQuery)
   const setActiveTags   = useKanbanStore(s => s.setActiveTags)
   const toggleTag       = useKanbanStore(s => s.toggleTag)
+  const loadBoards      = useKanbanStore(s => s.loadBoards)
+  const loadBoard       = useKanbanStore(s => s.loadBoard)
 
   const currentBoard  = boards.find(b => b.id === boardId)
   const isNotesBoard  = currentBoard?.type === "notes"
@@ -209,20 +227,134 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
     ? () => { onSettingsClick(); setSettingsOpen(true) }
     : () => setSettingsOpen(true)
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!currentBoard) return
-    downloadBoardJSON(currentBoard, columns, tasks)
+    await downloadBoardJSON(currentBoard, columns, tasks)
+    // Show browser notification if not Tauri (Tauri shows its own dialog)
+    if (!isTauri()) {
+      alert(`Board "${currentBoard.name}" exported successfully!\n\nCheck your Downloads folder.`)
+    }
   }
 
-  const handleImport = () => {
-    const input = createFileINPUT()
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (!file) return
+  const handleBackup = async () => {
+    // Get all data from IndexedDB
+    const allBoards = await db.boards.toArray()
+    const allColumns = await db.columns.toArray()
+    const allTasks = await db.tasks.toArray()
+    const allComments = await db.comments.toArray()
+
+    await downloadDatabaseBackup(allBoards, allColumns, allTasks, allComments)
+    
+    // Show browser notification if not Tauri (Tauri shows its own dialog)
+    if (!isTauri()) {
+      alert(`Database backup exported successfully!\n\nCheck your Downloads folder.`)
+    }
+  }
+
+  const handleRestore = async () => {
+    if (isTauri()) {
+      // Use Tauri's open dialog
       try {
-        const content = await readFileAsText(file)
+        const content = await openFileInTauri()
+        if (!content) return
+        
+        const backup = parseDatabaseBackup(content)
+        if (!backup) {
+          alert("Invalid backup file format")
+          return
+        }
+        setPendingBackupData(backup)
+        setShowRestoreDialog(true)
+      } catch (err) {
+        console.error("Restore failed:", err)
+        alert("Failed to read backup file")
+      }
+    } else {
+      // Use browser file input
+      const input = createFileINPUT()
+      input.onchange = async (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0]
+        if (!file) return
+        try {
+          const content = await readFileAsText(file)
+          const backup = parseDatabaseBackup(content)
+          if (!backup) {
+            alert("Invalid backup file format")
+            return
+          }
+          setPendingBackupData(backup)
+          setShowRestoreDialog(true)
+        } catch (err) {
+          console.error("Restore failed:", err)
+          alert("Failed to read backup file")
+        }
+      }
+      input.click()
+    }
+  }
+
+  const confirmRestore = async () => {
+    if (!pendingBackupData) return
+    try {
+      // Clear existing data
+      await db.transaction("rw", db.boards, db.columns, db.tasks, db.comments, async () => {
+        await db.boards.clear()
+        await db.columns.clear()
+        await db.tasks.clear()
+        await db.comments.clear()
+
+        // Restore boards
+        for (const board of pendingBackupData.boards) {
+          await db.boards.add(board)
+        }
+        // Restore columns
+        for (const col of pendingBackupData.columns) {
+          await db.columns.add(col)
+        }
+        // Restore tasks
+        for (const task of pendingBackupData.tasks) {
+          await db.tasks.add(task)
+        }
+        // Restore comments
+        for (const comment of pendingBackupData.comments || []) {
+          await db.comments.add(comment)
+        }
+      })
+
+      // Reload the app data
+      await loadBoards()
+      setShowRestoreDialog(false)
+      setPendingBackupData(null)
+      
+      // Show success notification
+      if (isTauri()) {
+        try {
+          const { message } = await import('@tauri-apps/plugin-dialog')
+          await message('Database restored successfully!')
+        } catch {
+          alert("Database restored successfully!")
+        }
+      } else {
+        alert("Database restored successfully! The app will now reflect the restored data.")
+      }
+    } catch (err) {
+      console.error("Restore failed:", err)
+      alert("Failed to restore database")
+    }
+  }
+
+  const handleImport = async () => {
+    if (isTauri()) {
+      // Use Tauri's open dialog
+      try {
+        const content = await openFileInTauri()
+        if (!content) return
+        
         const exported = parseExportJSON(content)
-        if (!exported) { alert("Invalid file format"); return }
+        if (!exported) {
+          alert("Invalid file format")
+          return
+        }
         const newBoardId = `board_${Date.now()}`
         await store.createBoard({ ...exported.board, id: newBoardId })
         const columnIds: Record<string, string> = {}
@@ -240,8 +372,36 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
         console.error("Import failed:", err)
         alert("Failed to import board")
       }
+    } else {
+      // Use browser file input
+      const input = createFileINPUT()
+      input.onchange = async (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0]
+        if (!file) return
+        try {
+          const content = await readFileAsText(file)
+          const exported = parseExportJSON(content)
+          if (!exported) { alert("Invalid file format"); return }
+          const newBoardId = `board_${Date.now()}`
+          await store.createBoard({ ...exported.board, id: newBoardId })
+          const columnIds: Record<string, string> = {}
+          for (const col of exported.columns) {
+            const newColId = `col_${Date.now()}_${Math.random()}`
+            columnIds[col.id] = newColId
+            await store.createColumn({ ...col, id: newColId, boardId: newBoardId } as Column)
+          }
+          for (const task of exported.tasks) {
+            const newColId = columnIds[task.columnId]
+            if (newColId) await store.createTask({ ...task, id: `task_${Date.now()}_${Math.random()}`, columnId: newColId } as Task)
+          }
+          alert(`Board "${exported.board.name}" imported successfully!`)
+        } catch (err) {
+          console.error("Import failed:", err)
+          alert("Failed to import board")
+        }
+      }
+      input.click()
     }
-    input.click()
   }
 
   // Stats for the board name area
@@ -380,12 +540,27 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
             items={[
               { label: "Export Board", onClick: handleExport },
               { label: "Import Board", onClick: handleImport },
+              { separator: true } as const,
+              { label: "Backup Database", onClick: handleBackup },
+              { label: "Restore Database", onClick: handleRestore },
             ]}
             onClose={() => setImportExportMenuOpen(false)}
             anchorRef={importExportMenuRef as React.RefObject<HTMLElement>}
             align="right"
           />
         )}
+
+        {/* Restore Confirmation Dialog */}
+        <ConfirmDialog
+          isOpen={showRestoreDialog}
+          onClose={() => { setShowRestoreDialog(false); setPendingBackupData(null) }}
+          onConfirm={confirmRestore}
+          title="Restore Database"
+          message="Warning: This will replace all current data with the backup. This action cannot be undone. Continue?"
+          confirmText="Restore"
+          cancelText="Cancel"
+          variant="danger"
+        />
       </div>
 
       {/* ── Panels ───────────────────────────────────────────────────── */}

@@ -80,12 +80,15 @@ export default function EmptyState({ onCreateBoard }: Props) {
       <div className="max-w-2xl w-full">
         {/* Header */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-6"
-            style={{ background: "var(--accent)" }}>
-            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-            </svg>
-          </div>
+          <img
+            src="/icon.png"
+            alt="TaskFlow"
+            className="w-20 h-20 rounded-2xl mb-6"
+            style={{ 
+              objectFit: "contain",
+              background: "var(--bg-popover)",
+            }}
+          />
           <h1 className="text-3xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>TaskFlow</h1>
           <p className="text-lg" style={{ color: "var(--text-secondary)" }}>Create your first board to get started</p>
         </div>

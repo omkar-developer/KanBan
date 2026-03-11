@@ -1,6 +1,6 @@
 export interface Comment {
     id: string;
     taskId: string;
-    text: string;
+    content: string;
     createdAt: number;
 }

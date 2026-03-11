@@ -3,7 +3,7 @@ import type { Board }    from "../models/Board"
 import type { Column }   from "../models/Column"
 import type { Task }     from "../models/Task"
 import type { Comment }  from "../models/Comment"
-import { store }         from "../storage/indexeddbStore"
+import { store } from "../storage/storage"
 import { createId }      from "../utils/id"
 
 interface KanbanState {
