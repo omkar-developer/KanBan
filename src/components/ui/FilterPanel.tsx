@@ -29,7 +29,7 @@ export default function FilterPanel({
   return (
     <div className="fixed inset-0 z-40">
       {/* Backdrop */}
-      <div 
+      <div
         className="absolute inset-0"
         style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
         onClick={onClose}
@@ -44,15 +44,21 @@ export default function FilterPanel({
         }}
       >
         {/* Header */}
-        <div className="p-4 border-b" style={{ borderColor: "var(--border)" }}>
+        <div className="p-4" style={{ borderBottom: "1px solid var(--border)" }}>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold" style={{ color: "var(--text-primary)" }}>
               Filter by Tags
             </h3>
             <button
               onClick={onClose}
-              className="p-1 hover:opacity-70 transition-opacity"
-              style={{ color: "var(--text-secondary)" }}
+              className="p-1 rounded-lg transition"
+              style={{ color: "var(--text-secondary)", backgroundColor: "transparent" }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "var(--bg-input)"
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent"
+              }}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -95,9 +101,13 @@ export default function FilterPanel({
                 <button
                   key={tag}
                   onClick={() => onToggleTag(tag)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded transition-all ${
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded transition-all border ${
                     isActive ? "opacity-100" : "opacity-75 hover:opacity-100"
-                  } ${c.bg} ${c.border} border`}
+                  } ${c.bg} ${c.border}`}
+                  style={{
+                    borderColor: isActive ? "var(--accent)" : "var(--border)",
+                    backgroundColor: isActive ? "var(--accent-muted)" : "transparent",
+                  }}
                 >
                   <div
                     className="w-4 h-4 rounded border flex items-center justify-center transition-all"
@@ -107,7 +117,7 @@ export default function FilterPanel({
                     }}
                   >
                     {isActive && (
-                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3 h-3" style={{ color: "#fff" }} fill="currentColor" viewBox="0 0 24 24">
                         <path d="M20.285 2.285L9.567 13.003L3.693 7.129a1 1 0 00-1.414 1.414l7.071 7.071a1 1 0 001.414 0l11.313-11.313a1 1 0 00-1.414-1.414z" />
                       </svg>
                     )}
@@ -121,14 +131,14 @@ export default function FilterPanel({
 
         {/* Footer */}
         {activeTags.length > 0 && (
-          <div className="p-4 border-t" style={{ borderColor: "var(--border)" }}>
+          <div className="p-4" style={{ borderTop: "1px solid var(--border)" }}>
             <button
               onClick={onClearTags}
-              className="w-full px-3 py-2 text-sm font-medium rounded transition-colors"
+              className="w-full px-3 py-2 text-sm font-medium rounded transition-colors border"
               style={{
                 backgroundColor: "var(--bg-popover)",
                 color: "var(--text-primary)",
-                border: `1px solid var(--border)`,
+                borderColor: "var(--border)",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = "var(--border-hover)"

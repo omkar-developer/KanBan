@@ -1,48 +1,47 @@
 /**
  * useAutoBackup — Tauri desktop auto-backup system.
  *
- * ON CLOSE:   Copies taskflow.db → taskflow.db.bak (instant OS file copy)
- * ON STARTUP: If DB file is missing or corrupt, auto-restores from .bak
+ * Uses BaseDirectory.AppLocalData so all fs calls stay within the
+ * app's sandboxed directory — no absolute path construction needed.
  *
- * Usage:
- *   1. Call initWithAutoRestore() in main.tsx before rendering
- *   2. Call useAutoBackup() once inside your root component
+ * ON CLOSE:   Copies taskflow.db → taskflow.db.bak
+ * ON STARTUP: If DB missing or corrupt, restores from .bak
  */
 
 import { useEffect } from "react"
 import { isTauri } from "../utils/exportImport"
 
-const DB_FILENAME  = "taskflow.db"
-const BAK_FILENAME = "taskflow.db.bak"
+const DB_FILE  = "taskflow.db"
+const BAK_FILE = "taskflow.db.bak"
 
-async function getDataDir(): Promise<string> {
-  const { appLocalDataDir } = await import("@tauri-apps/api/path")
-  return await appLocalDataDir()
+async function getBaseDir() {
+  const { BaseDirectory } = await import("@tauri-apps/plugin-fs")
+  return BaseDirectory.AppLocalData
 }
 
 async function copyDbToBackup(): Promise<void> {
   try {
-    const { copyFile, mkdir } = await import("@tauri-apps/plugin-fs")
-    const dir = await getDataDir()
-    await mkdir(dir, { recursive: true }).catch(() => {})
-    await copyFile(`${dir}${DB_FILENAME}`, `${dir}${BAK_FILENAME}`)
+    const { copyFile, BaseDirectory } = await import("@tauri-apps/plugin-fs")
+    const base = BaseDirectory.AppLocalData
+    await copyFile(DB_FILE, BAK_FILE, { fromPathBaseDir: base, toPathBaseDir: base })
     console.log("[AutoBackup] DB backed up successfully")
   } catch (err) {
     console.warn("[AutoBackup] Backup skipped:", err)
   }
 }
 
-async function restoreFromBackup(dir: string): Promise<boolean> {
+async function restoreFromBackup(): Promise<boolean> {
   try {
-    const { copyFile, exists } = await import("@tauri-apps/plugin-fs")
-    const bak = `${dir}${BAK_FILENAME}`
+    const { copyFile, exists, BaseDirectory } = await import("@tauri-apps/plugin-fs")
+    const base = BaseDirectory.AppLocalData
 
-    if (!(await exists(bak))) {
+    const bakExists = await exists(BAK_FILE, { baseDir: base })
+    if (!bakExists) {
       console.warn("[AutoBackup] No backup file found")
       return false
     }
 
-    await copyFile(bak, `${dir}${DB_FILENAME}`)
+    await copyFile(BAK_FILE, DB_FILE, { fromPathBaseDir: base, toPathBaseDir: base })
     console.log("[AutoBackup] Restored from backup successfully")
     return true
   } catch (err) {
@@ -53,46 +52,35 @@ async function restoreFromBackup(dir: string): Promise<boolean> {
 
 /**
  * Call ONCE in main.tsx before ReactDOM.render.
- *
- * Logic:
- *  1. If DB file doesn't exist but .bak does → restore before SQLite creates a blank DB
- *  2. If DB file exists but fails to open (corrupt) → restore from .bak
- *  3. If DB opens fine → nothing to do
- *
  * Returns 'ok' | 'restored' | 'no-backup'
  */
 export async function initWithAutoRestore(): Promise<"ok" | "restored" | "no-backup"> {
   if (!isTauri()) return "ok"
 
-  const { exists } = await import("@tauri-apps/plugin-fs")
-  const dir = await getDataDir()
-  const dbPath = `${dir}${DB_FILENAME}`
+  const { exists, remove, BaseDirectory } = await import("@tauri-apps/plugin-fs")
+  const base = BaseDirectory.AppLocalData
 
-  // ── Case 1: DB file is missing entirely ───────────────────────────────────
-  if (!(await exists(dbPath))) {
-    console.warn("[AutoBackup] DB file missing, checking for backup...")
-    const restored = await restoreFromBackup(dir)
+  // ── Case 1: DB file missing ───────────────────────────────────────────────
+  const dbExists = await exists(DB_FILE, { baseDir: base })
+  if (!dbExists) {
+    console.warn("[AutoBackup] DB missing, checking for backup...")
+    const restored = await restoreFromBackup()
     return restored ? "restored" : "no-backup"
   }
 
-  // ── Case 2: DB file exists, check if it opens cleanly ────────────────────
+  // ── Case 2: DB exists, verify it's healthy ────────────────────────────────
   try {
     const Database = (await import("@tauri-apps/plugin-sql")).default
-    const db = await Database.load(`sqlite:${DB_FILENAME}`)
-    // Run a quick sanity query — catches corrupt files that open but are broken
+    const db = await Database.load(`sqlite:${DB_FILE}`)
     await db.select("SELECT name FROM sqlite_master WHERE type='table' LIMIT 1")
     return "ok"
   } catch {
-    console.warn("[AutoBackup] DB corrupt or unreadable, attempting restore...")
+    console.warn("[AutoBackup] DB corrupt, attempting restore...")
   }
 
-  // ── Case 3: DB is corrupt — delete it and restore from backup ────────────
-  try {
-    const { remove } = await import("@tauri-apps/plugin-fs")
-    await remove(dbPath).catch(() => {}) // remove corrupt file so SQLite doesn't reuse it
-  } catch { /* ignore */ }
-
-  const restored = await restoreFromBackup(dir)
+  // ── Case 3: Corrupt — remove and restore ─────────────────────────────────
+  await remove(DB_FILE, { baseDir: base }).catch(() => {})
+  const restored = await restoreFromBackup()
   return restored ? "restored" : "no-backup"
 }
 

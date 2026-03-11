@@ -12,7 +12,7 @@ import {
 } from "lucide-react"
 
 interface SidebarProps {
-  onSelectBoard?: (boardId: string | null) => void
+  onSelectBoard?: (boardId: string | null, boardType?: "kanban" | "notes") => void
 }
 
 const ICON_OPTIONS = [
@@ -117,12 +117,13 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
   }
 
   const handleSelectBoard = (boardId: string) => {
-    onSelectBoard?.(boardId)
+    const board = boards.find(b => b.id === boardId)
+    onSelectBoard?.(boardId, (board?.type as "kanban" | "notes") || "kanban")
   }
 
-  const handleAddToCategory = (category: string) => {
+  const handleAddToCategory = (category: string, type: "kanban" | "notes" = "kanban") => {
     setShowCreateModal(true)
-    setModalType("kanban")
+    setModalType(type)
     setModalCategory(category)
   }
 
@@ -215,11 +216,22 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
                   e.stopPropagation()
                   handleToggleFavorite(board.id, e)
                 }}
-                className="p-1.5 rounded hover:bg-white/10 transition-colors"
+                className="p-1.5 rounded transition-colors"
+                style={{ backgroundColor: "transparent" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--bg-input)"
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent"
+                }}
                 title={board.favorite ? "Remove from favorites" : "Add to favorites"}
               >
                 <svg
-                  className={`w-4 h-4 ${board.favorite ? 'text-yellow-400 fill-yellow-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className="w-4 h-4"
+                  style={{
+                    color: board.favorite ? "#fbbf24" : "var(--text-muted)",
+                    fill: board.favorite ? "currentColor" : "none",
+                  }}
                   fill={board.favorite ? "currentColor" : "none"}
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -232,10 +244,17 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
                   e.stopPropagation()
                   setMenuOpenBoardId(isMenuOpen ? null : uniqueKey)
                 }}
-                className="p-1.5 rounded hover:bg-white/10 transition-colors"
+                className="p-1.5 rounded transition-colors"
+                style={{ backgroundColor: "transparent" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--bg-input)"
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent"
+                }}
                 title="Board options"
               >
-                <svg className="w-4 h-4 text-zinc-500 hover:text-zinc-300" fill="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" style={{ color: "var(--text-muted)" }} fill="currentColor" viewBox="0 0 24 24">
                   <circle cx="12" cy="5" r="2" />
                   <circle cx="12" cy="12" r="2" />
                   <circle cx="12" cy="19" r="2" />
@@ -254,8 +273,8 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
             <div
               className="absolute right-0 top-full mt-1 py-1 rounded-lg border shadow-xl z-[9999] min-w-[140px]"
               style={{
-                background: 'var(--bg-popover, #1c1c1c)',
-                borderColor: 'var(--border, rgba(255,255,255,0.06))',
+                background: 'var(--bg-popover)',
+                borderColor: 'var(--border)',
               }}
             >
               <button
@@ -263,7 +282,19 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
                   setEditingBoard(board)
                   setMenuOpenBoardId(null)
                 }}
-                className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-white/[0.08] transition-colors flex items-center gap-2"
+                className="w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2"
+                style={{
+                  color: 'var(--text-secondary)',
+                  backgroundColor: 'transparent',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--bg-input)'
+                  e.currentTarget.style.color = 'var(--text-primary)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                  e.currentTarget.style.color = 'var(--text-secondary)'
+                }}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -275,7 +306,17 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
                   setDeletingBoardId(board.id)
                   setMenuOpenBoardId(null)
                 }}
-                className="w-full px-3 py-2 text-left text-sm text-rose-400 hover:bg-white/[0.08] transition-colors flex items-center gap-2"
+                className="w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2"
+                style={{
+                  color: 'var(--accent)',
+                  backgroundColor: 'transparent',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--accent-muted)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                }}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -324,10 +365,17 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
               </div>
               <button
                 onClick={() => setIsCollapsed(true)}
-                className="p-1.5 rounded hover:bg-white/10 transition-colors"
+                className="p-1.5 rounded transition-colors"
+                style={{ backgroundColor: "transparent" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--bg-input)"
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent"
+                }}
                 title="Collapse sidebar"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" style={{ color: "var(--text-secondary)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7 7" />
                 </svg>
               </button>
@@ -336,10 +384,17 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
           {isCollapsed && (
             <button
               onClick={() => setIsCollapsed(false)}
-              className="p-2 rounded hover:bg-white/10 transition-colors w-full flex justify-center"
+              className="p-2 rounded transition-colors w-full flex justify-center"
+              style={{ backgroundColor: "transparent" }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "var(--bg-input)"
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent"
+              }}
               title="Expand sidebar"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6" style={{ color: "var(--text-secondary)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
@@ -362,6 +417,20 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
               style={{
                 backgroundColor: 'var(--accent)',
                 color: '#fff',
+                transform: "scale(1)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "var(--accent-muted)"
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "var(--accent)"
+                e.currentTarget.style.transform = "scale(1)"
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = "scale(0.98)"
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = "scale(1)"
               }}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -381,15 +450,22 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
                 <button
                   key={board.id}
                   onClick={() => handleSelectBoard(board.id)}
-                  className="w-full p-2 rounded-lg hover:bg-white/10 transition-colors flex items-center justify-center"
+                  className="w-full p-2 rounded-lg transition-colors flex items-center justify-center"
+                  style={{ backgroundColor: "transparent" }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "var(--bg-input)"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent"
+                  }}
                   title={board.name}
                 >
                   {getBoardIcon(board) || (
-                    <div 
+                    <div
                       className="w-8 h-8 rounded flex items-center justify-center"
-                      style={{ 
-                        background: board.color 
-                          ? `linear-gradient(135deg, ${board.color} 0%, ${board.color}dd 100%)` 
+                      style={{
+                        background: board.color
+                          ? `linear-gradient(135deg, ${board.color} 0%, ${board.color}dd 100%)`
                           : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)'
                       }}
                     >
@@ -432,7 +508,7 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
                   <ExplorerTree<Board>
                     items={notesBoards.map(board => ({ ...board, category: board.category || "Uncategorized" }))}
                     groupKey="category"
-                    onCreate={handleAddToCategory}
+                    onCreate={(category) => handleAddToCategory(category, "notes")}
                     renderItem={(board) => renderBoardItem(board, 'notes-')}
                   />
                 </div>
@@ -440,8 +516,8 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
 
               {boards.length === 0 && (
                 <div className="text-center py-8">
-                  <p className="text-zinc-400 text-sm">No boards yet</p>
-                  <p className="text-zinc-500 text-xs mt-1">Create one to get started</p>
+                  <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>No boards yet</p>
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginTop: "0.25rem" }}>Create one to get started</p>
                 </div>
               )}
             </div>
@@ -453,20 +529,30 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
 
       {/* Board Creation Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] backdrop-blur-sm" onClick={() => setShowCreateModal(false)}>
+        <div className="fixed inset-0 flex items-center justify-center z-[100] backdrop-blur-sm"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.6)" }}
+          onClick={() => setShowCreateModal(false)}
+        >
           <div
             className="rounded-xl p-6 w-[420px] shadow-2xl max-h-[90vh] overflow-y-auto"
-            style={{ background: "var(--bg-modal, #161616)", border: "1px solid var(--border, rgba(255,255,255,0.06))" }}
+            style={{ background: "var(--bg-modal)", border: "1px solid var(--border)" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-white">Create</h2>
+              <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Create</h2>
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+                className="p-2 rounded-lg transition-colors"
+                style={{ backgroundColor: "transparent" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--bg-input)"
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent"
+                }}
                 aria-label="Close modal"
               >
-                <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" style={{ color: "var(--text-secondary)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -475,31 +561,54 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
             <div className="space-y-4">
               {/* Board Name */}
               <div>
-                <label className="block text-zinc-500 text-sm mb-2 font-medium">Name</label>
+                <label className="block text-sm mb-2 font-medium" style={{ color: "var(--text-muted)" }}>Name</label>
                 <input
                   ref={modalRef}
                   type="text"
                   value={newBoardName}
                   onChange={(e) => setNewBoardName(e.target.value)}
                   placeholder="Enter name..."
-                  className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-4 py-3 text-zinc-200 placeholder-zinc-600 outline-none focus:border-white/25 focus:ring-1 focus:ring-white/10 transition-all"
+                  className="w-full rounded-lg px-4 py-3 outline-none transition-all border"
+                  style={{
+                    backgroundColor: "var(--bg-input)",
+                    borderColor: "var(--border)",
+                    color: "var(--text-primary)",
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = "var(--border-focus)"
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = "var(--border)"
+                  }}
                   onKeyDown={(e) => e.key === 'Enter' && handleCreateBoard()}
                 />
               </div>
 
               {/* Board Type */}
               <div>
-                <label className="block text-zinc-500 text-sm mb-2 font-medium">Type</label>
+                <label className="block text-sm mb-2 font-medium" style={{ color: "var(--text-muted)" }}>Type</label>
                 <div className="flex gap-2">
                   {(["kanban", "notes"] as const).map((type) => (
                     <button
                       key={type}
                       onClick={() => setModalType(type)}
-                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        modalType === type
-                          ? 'bg-sky-600 text-white'
-                          : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08]'
-                      }`}
+                      className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+                      style={{
+                        backgroundColor: modalType === type ? "var(--accent)" : "var(--bg-input)",
+                        color: modalType === type ? "#fff" : "var(--text-secondary)",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (modalType !== type) {
+                          e.currentTarget.style.backgroundColor = "var(--bg-column-solid)"
+                          e.currentTarget.style.color = "var(--text-primary)"
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (modalType !== type) {
+                          e.currentTarget.style.backgroundColor = "var(--bg-input)"
+                          e.currentTarget.style.color = "var(--text-secondary)"
+                        }
+                      }}
                     >
                       {type === "kanban" ? "Kanban" : "Notes"}
                     </button>
@@ -509,70 +618,124 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
 
               {/* Category */}
               <div>
-                <label className="block text-zinc-500 text-sm mb-2 font-medium">Category</label>
+                <label className="block text-sm mb-2 font-medium" style={{ color: "var(--text-muted)" }}>Category</label>
                 <input
                   type="text"
                   value={modalCategory}
                   onChange={(e) => setModalCategory(e.target.value)}
                   placeholder="Enter category (optional)..."
-                  className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-4 py-3 text-zinc-200 placeholder-zinc-600 outline-none focus:border-white/25 focus:ring-1 focus:ring-white/10 transition-all"
+                  className="w-full rounded-lg px-4 py-3 outline-none transition-all border"
+                  style={{
+                    backgroundColor: "var(--bg-input)",
+                    borderColor: "var(--border)",
+                    color: "var(--text-primary)",
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = "var(--border-focus)"
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = "var(--border)"
+                  }}
                 />
               </div>
 
               {/* Board Icon */}
               <div>
-                <label className="block text-zinc-500 text-sm mb-2 font-medium">Icon</label>
+                <label className="block text-sm mb-2 font-medium" style={{ color: "var(--text-muted)" }}>Icon</label>
                 <div className="flex gap-1 mb-2">
                   <button
                     onClick={() => setIconTab("icon")}
-                    className={`flex-1 text-[11px] font-semibold py-1.5 rounded-lg transition ${
-                      iconTab === "icon" 
-                        ? "bg-white/[0.08] text-white" 
-                        : "text-zinc-500 hover:text-zinc-300"
-                    }`}
+                    className="flex-1 text-[11px] font-semibold py-1.5 rounded-lg transition"
+                    style={{
+                      backgroundColor: iconTab === "icon" ? "var(--bg-input)" : "transparent",
+                      color: iconTab === "icon" ? "var(--text-primary)" : "var(--text-muted)",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (iconTab !== "icon") {
+                        e.currentTarget.style.color = "var(--text-secondary)"
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (iconTab !== "icon") {
+                        e.currentTarget.style.color = "var(--text-muted)"
+                      }
+                    }}
                   >
                     Icon
                   </button>
                   <button
                     onClick={() => setIconTab("color")}
-                    className={`flex-1 text-[11px] font-semibold py-1.5 rounded-lg transition ${
-                      iconTab === "color" 
-                        ? "bg-white/[0.08] text-white" 
-                        : "text-zinc-500 hover:text-zinc-300"
-                    }`}
+                    className="flex-1 text-[11px] font-semibold py-1.5 rounded-lg transition"
+                    style={{
+                      backgroundColor: iconTab === "color" ? "var(--bg-input)" : "transparent",
+                      color: iconTab === "color" ? "var(--text-primary)" : "var(--text-muted)",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (iconTab !== "color") {
+                        e.currentTarget.style.color = "var(--text-secondary)"
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (iconTab !== "color") {
+                        e.currentTarget.style.color = "var(--text-muted)"
+                      }
+                    }}
                   >
                     Color
                   </button>
                 </div>
 
                 {iconTab === "icon" ? (
-                  <div className="grid grid-cols-6 gap-1 max-h-40 overflow-y-auto p-2 bg-white/[0.02] rounded-lg border border-white/[0.06]">
+                  <div className="grid grid-cols-6 gap-1 max-h-40 overflow-y-auto p-2 rounded-lg border"
+                    style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)" }}>
                     {ICON_OPTIONS.map((opt) => {
                       const IconComponent = opt.icon
                       return (
                         <button
                           key={opt.id}
                           onClick={() => setModalIcon(opt.id)}
-                          className={`flex flex-col items-center gap-1 p-2 rounded-lg transition hover:bg-white/[0.08] ${
-                            modalIcon === opt.id ? "bg-white/[0.1]" : ""
-                          }`}
+                          className="flex flex-col items-center gap-1 p-2 rounded-lg transition"
+                          style={{
+                            backgroundColor: modalIcon === opt.id ? "var(--bg-input)" : "transparent",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "var(--bg-input)"
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = modalIcon === opt.id ? "var(--bg-input)" : "transparent"
+                          }}
                           title={opt.id}
                         >
-                          <IconComponent width={16} height={16} style={{ color: modalIcon === opt.id ? modalColor : "#52525b" }} />
-                          <span className="text-[8px] text-zinc-600 truncate w-full text-center">{opt.id}</span>
+                          <IconComponent width={16} height={16} style={{ color: modalIcon === opt.id ? modalColor : "var(--text-muted)" }} />
+                          <span className="text-[8px] truncate w-full text-center" style={{ color: "var(--text-muted)" }}>{opt.id}</span>
                         </button>
                       )
                     })}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-1.5 max-h-40 overflow-y-auto p-2 bg-white/[0.02] rounded-lg border border-white/[0.06]">
+                  <div className="grid grid-cols-2 gap-1.5 max-h-40 overflow-y-auto p-2 rounded-lg border"
+                    style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)" }}>
                     {COLOR_OPTIONS.map((c) => (
                       <button
                         key={c.value}
                         onClick={() => setModalColor(c.value)}
-                        className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition hover:bg-white/[0.06] ${
-                          modalColor === c.value ? "bg-white/[0.08] text-white" : "text-zinc-400"
-                        }`}
+                        className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition"
+                        style={{
+                          backgroundColor: modalColor === c.value ? "var(--bg-input)" : "transparent",
+                          color: modalColor === c.value ? "var(--text-primary)" : "var(--text-muted)",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (modalColor !== c.value) {
+                            e.currentTarget.style.backgroundColor = "var(--bg-column-solid)"
+                            e.currentTarget.style.color = "var(--text-secondary)"
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (modalColor !== c.value) {
+                            e.currentTarget.style.backgroundColor = "transparent"
+                            e.currentTarget.style.color = "var(--text-muted)"
+                          }
+                        }}
                       >
                         <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: c.value }} />
                         {c.label}
@@ -586,7 +749,33 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
             <button
               onClick={handleCreateBoard}
               disabled={!newBoardName.trim()}
-              className="w-full mt-6 bg-sky-600 hover:bg-sky-700 disabled:bg-zinc-700 disabled:text-zinc-500 text-white px-4 py-3 rounded-lg font-semibold transition-all"
+              className="w-full mt-6 px-4 py-3 rounded-lg font-semibold transition-all"
+              style={{
+                backgroundColor: !newBoardName.trim() ? "var(--bg-input)" : "var(--accent)",
+                color: !newBoardName.trim() ? "var(--text-muted)" : "#fff",
+                transform: "scale(1)",
+              }}
+              onMouseEnter={(e) => {
+                if (newBoardName.trim()) {
+                  e.currentTarget.style.backgroundColor = "var(--accent-muted)"
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (newBoardName.trim()) {
+                  e.currentTarget.style.backgroundColor = "var(--accent)"
+                  e.currentTarget.style.transform = "scale(1)"
+                }
+              }}
+              onMouseDown={(e) => {
+                if (newBoardName.trim()) {
+                  e.currentTarget.style.transform = "scale(0.98)"
+                }
+              }}
+              onMouseUp={(e) => {
+                if (newBoardName.trim()) {
+                  e.currentTarget.style.transform = "scale(1)"
+                }
+              }}
             >
               Create Board
             </button>

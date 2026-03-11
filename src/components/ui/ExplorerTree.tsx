@@ -76,7 +76,14 @@ export default function ExplorerTree<T extends { id: string }>({
               <div className="flex items-center gap-2 py-1 px-2">
                 <button
                   onClick={() => toggleGroup(groupLabel)}
-                  className="w-4 h-4 flex items-center justify-center rounded hover:bg-white/5 transition-colors"
+                  className="w-4 h-4 flex items-center justify-center rounded transition-colors"
+                  style={{ backgroundColor: "transparent" }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "var(--bg-input)"
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent"
+                  }}
                 >
                   <svg
                     className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
@@ -100,8 +107,14 @@ export default function ExplorerTree<T extends { id: string }>({
                 {onCreate && (
                   <button
                     onClick={() => handleCreate(groupLabel)}
-                    className="w-5 h-5 flex items-center justify-center rounded hover:bg-white/10 transition-colors text-xs font-bold"
-                    style={{ color: 'var(--accent)' }}
+                    className="w-5 h-5 flex items-center justify-center rounded transition-colors text-xs font-bold"
+                    style={{ color: 'var(--accent)', backgroundColor: "transparent" }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "var(--bg-input)"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent"
+                    }}
                     title={`Add to ${groupLabel}`}
                   >
                     +
@@ -112,7 +125,7 @@ export default function ExplorerTree<T extends { id: string }>({
 
             {/* Items within group */}
             {isExpanded && (
-              <div className="ml-5 space-y-1 pl-3 border-l border-white/5">
+              <div className="ml-5 space-y-1 pl-3" style={{ borderLeft: "1px solid var(--border)" }}>
                 {groupItems.map((item) => (
                   <div key={item.id} onClick={() => handleSelectItem(item)} className="cursor-pointer">
                     {renderItem(item)}

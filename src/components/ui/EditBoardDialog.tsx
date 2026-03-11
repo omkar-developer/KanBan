@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import Modal from './Modal'
-import type { Board } from '../models/Board'
+import type { Board } from '../../models/Board'
 import {
   Circle, Square, Bookmark, Star, Zap, Flame, Lightbulb, Rocket,
   Bug, Wrench, ClipboardList, LayoutList, Inbox, Pencil, FileText,
@@ -120,8 +120,14 @@ export default function EditBoardDialog({
             onChange={(e) => setName(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Enter board name..."
-            className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-4 py-3 outline-none focus:border-white/25 focus:ring-1 focus:ring-white/10 transition-all"
-            style={{ color: "var(--text-primary)", backgroundColor: "var(--bg-input)" }}
+            className="w-full rounded-lg px-4 py-3 outline-none transition-all border"
+            style={{ color: "var(--text-primary)", backgroundColor: "var(--bg-input)", borderColor: "var(--border)" }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = "var(--border-focus)"
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = "var(--border)"
+            }}
             autoFocus
           />
         </div>
@@ -132,28 +138,48 @@ export default function EditBoardDialog({
           <div className="flex gap-1 mb-2">
             <button
               onClick={() => setIconTab("icon")}
-              className={`flex-1 text-[11px] font-semibold py-1.5 rounded-lg transition ${
-                iconTab === "icon" 
-                  ? "bg-white/[0.08] text-white" 
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
+              className="flex-1 text-[11px] font-semibold py-1.5 rounded-lg transition"
+              style={{
+                backgroundColor: iconTab === "icon" ? "var(--bg-input)" : "transparent",
+                color: iconTab === "icon" ? "var(--text-primary)" : "var(--text-muted)",
+              }}
+              onMouseEnter={(e) => {
+                if (iconTab !== "icon") {
+                  e.currentTarget.style.color = "var(--text-secondary)"
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (iconTab !== "icon") {
+                  e.currentTarget.style.color = "var(--text-muted)"
+                }
+              }}
             >
               Icon
             </button>
             <button
               onClick={() => setIconTab("color")}
-              className={`flex-1 text-[11px] font-semibold py-1.5 rounded-lg transition ${
-                iconTab === "color" 
-                  ? "bg-white/[0.08] text-white" 
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
+              className="flex-1 text-[11px] font-semibold py-1.5 rounded-lg transition"
+              style={{
+                backgroundColor: iconTab === "color" ? "var(--bg-input)" : "transparent",
+                color: iconTab === "color" ? "var(--text-primary)" : "var(--text-muted)",
+              }}
+              onMouseEnter={(e) => {
+                if (iconTab !== "color") {
+                  e.currentTarget.style.color = "var(--text-secondary)"
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (iconTab !== "color") {
+                  e.currentTarget.style.color = "var(--text-muted)"
+                }
+              }}
             >
               Color
             </button>
           </div>
 
           {iconTab === "icon" ? (
-            <div className="grid grid-cols-6 gap-1 max-h-32 overflow-y-auto p-2 rounded-lg border" 
+            <div className="grid grid-cols-6 gap-1 max-h-32 overflow-y-auto p-2 rounded-lg border"
               style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)" }}>
               {ICON_OPTIONS.map((opt) => {
                 const IconComponent = opt.icon
@@ -161,10 +187,17 @@ export default function EditBoardDialog({
                   <button
                     key={opt.id}
                     onClick={() => setIcon(opt.id)}
-                    className={`flex flex-col items-center gap-1 p-2 rounded-lg transition hover:bg-white/[0.08] ${
-                      icon === opt.id ? "bg-white/[0.1]" : ""
-                    }`}
+                    className="flex flex-col items-center gap-1 p-2 rounded-lg transition hover:bg-white/[0.08]"
+                    style={{
+                      backgroundColor: icon === opt.id ? "var(--bg-input)" : "transparent",
+                    }}
                     title={opt.id}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "var(--bg-input)"
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = icon === opt.id ? "var(--bg-input)" : "transparent"
+                    }}
                   >
                     <IconComponent width={16} height={16} style={{ color: icon === opt.id ? color : "var(--text-muted)" }} />
                     <span className="text-[8px] truncate w-full text-center" style={{ color: "var(--text-muted)" }}>{opt.id}</span>
@@ -179,9 +212,23 @@ export default function EditBoardDialog({
                 <button
                   key={c.value}
                   onClick={() => setColor(c.value)}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition hover:bg-white/[0.06] ${
-                    color === c.value ? "bg-white/[0.08] text-white" : "text-zinc-400"
-                  }`}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[11px] font-medium transition"
+                  style={{
+                    backgroundColor: color === c.value ? "var(--bg-input)" : "transparent",
+                    color: color === c.value ? "var(--text-primary)" : "var(--text-muted)",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (color !== c.value) {
+                      e.currentTarget.style.backgroundColor = "var(--bg-column-solid)"
+                      e.currentTarget.style.color = "var(--text-secondary)"
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (color !== c.value) {
+                      e.currentTarget.style.backgroundColor = "transparent"
+                      e.currentTarget.style.color = "var(--text-muted)"
+                    }
+                  }}
                 >
                   <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: c.value }} />
                   {c.label}
@@ -199,7 +246,29 @@ export default function EditBoardDialog({
           className="flex-1 px-4 py-3 rounded-lg font-semibold transition-all"
           style={{
             backgroundColor: (!name.trim() || isSubmitting) ? "var(--bg-input)" : "var(--accent)",
-            color: (!name.trim() || isSubmitting) ? "var(--text-muted)" : "#fff"
+            color: (!name.trim() || isSubmitting) ? "var(--text-muted)" : "#fff",
+            transform: "scale(1)",
+          }}
+          onMouseEnter={(e) => {
+            if (name.trim() && !isSubmitting) {
+              e.currentTarget.style.backgroundColor = "var(--accent-muted)"
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (name.trim() && !isSubmitting) {
+              e.currentTarget.style.backgroundColor = "var(--accent)"
+              e.currentTarget.style.transform = "scale(1)"
+            }
+          }}
+          onMouseDown={(e) => {
+            if (name.trim() && !isSubmitting) {
+              e.currentTarget.style.transform = "scale(0.98)"
+            }
+          }}
+          onMouseUp={(e) => {
+            if (name.trim() && !isSubmitting) {
+              e.currentTarget.style.transform = "scale(1)"
+            }
           }}
         >
           {isSubmitting ? 'Saving...' : 'Save Changes'}
@@ -207,7 +276,20 @@ export default function EditBoardDialog({
         <button
           onClick={onClose}
           className="flex-1 px-4 py-3 rounded-lg font-semibold transition-all"
-          style={{ backgroundColor: "var(--bg-input)", color: "var(--text-primary)" }}
+          style={{ backgroundColor: "var(--bg-input)", color: "var(--text-primary)", transform: "scale(1)" }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "var(--bg-column-solid)"
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "var(--bg-input)"
+            e.currentTarget.style.transform = "scale(1)"
+          }}
+          onMouseDown={(e) => {
+            e.currentTarget.style.transform = "scale(0.98)"
+          }}
+          onMouseUp={(e) => {
+            e.currentTarget.style.transform = "scale(1)"
+          }}
         >
           Cancel
         </button>

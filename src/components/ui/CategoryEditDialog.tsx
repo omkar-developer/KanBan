@@ -71,7 +71,29 @@ export default function CategoryEditDialog({
           className="flex-1 px-4 py-3 rounded-lg font-semibold transition-all"
           style={{
             backgroundColor: (!newName.trim() || newName === categoryName) ? "var(--bg-input)" : "var(--accent)",
-            color: (!newName.trim() || newName === categoryName) ? "var(--text-muted)" : "#fff"
+            color: (!newName.trim() || newName === categoryName) ? "var(--text-muted)" : "#fff",
+            transform: "scale(1)",
+          }}
+          onMouseEnter={(e) => {
+            if (newName.trim() && newName !== categoryName) {
+              e.currentTarget.style.backgroundColor = "var(--accent-muted)"
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (newName.trim() && newName !== categoryName) {
+              e.currentTarget.style.backgroundColor = "var(--accent)"
+              e.currentTarget.style.transform = "scale(1)"
+            }
+          }}
+          onMouseDown={(e) => {
+            if (newName.trim() && newName !== categoryName) {
+              e.currentTarget.style.transform = "scale(0.98)"
+            }
+          }}
+          onMouseUp={(e) => {
+            if (newName.trim() && newName !== categoryName) {
+              e.currentTarget.style.transform = "scale(1)"
+            }
           }}
         >
           Rename
@@ -82,14 +104,44 @@ export default function CategoryEditDialog({
             onClose()
           }}
           className="px-4 py-3 rounded-lg font-semibold transition-all"
-          style={{ backgroundColor: "rgba(239, 68, 68, 0.2)", color: "#f87171" }}
+          style={{
+            backgroundColor: "var(--accent-muted)",
+            color: "var(--accent)",
+            transform: "scale(1)",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(251, 113, 133, 0.2)"
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "var(--accent-muted)"
+            e.currentTarget.style.transform = "scale(1)"
+          }}
+          onMouseDown={(e) => {
+            e.currentTarget.style.transform = "scale(0.98)"
+          }}
+          onMouseUp={(e) => {
+            e.currentTarget.style.transform = "scale(1)"
+          }}
         >
           Delete
         </button>
         <button
           onClick={onClose}
           className="flex-1 px-4 py-3 rounded-lg font-semibold transition-all"
-          style={{ backgroundColor: "var(--bg-input)", color: "var(--text-primary)" }}
+          style={{ backgroundColor: "var(--bg-input)", color: "var(--text-primary)", transform: "scale(1)" }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "var(--bg-column-solid)"
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "var(--bg-input)"
+            e.currentTarget.style.transform = "scale(1)"
+          }}
+          onMouseDown={(e) => {
+            e.currentTarget.style.transform = "scale(0.98)"
+          }}
+          onMouseUp={(e) => {
+            e.currentTarget.style.transform = "scale(1)"
+          }}
         >
           Cancel
         </button>

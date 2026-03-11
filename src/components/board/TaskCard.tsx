@@ -302,7 +302,7 @@ function QuickActions({
   const submitComment = async () => {
     const trimmed = text.trim()
     if (!trimmed) return
-    const comment: KanbanComment = { id: crypto.randomUUID(), taskId: task.id!, text: trimmed, createdAt: Date.now() }
+    const comment: KanbanComment = { id: crypto.randomUUID(), taskId: task.id!, content: trimmed, createdAt: Date.now() }
     await createComment(comment)
     setText("")
     onCommentAdded(comment)
@@ -813,7 +813,7 @@ export default function TaskCard({ task }: Props) {
                       <div className="space-y-1.5">
                         {pageComments.map((comment: KanbanComment) => (
                           <div key={comment.id} className="bg-white/[0.04] border border-[var(--border,rgba(255,255,255,0.06))] rounded-lg px-2.5 py-2">
-                            <p className="text-xs text-[var(--text-secondary,#a8a8b0)] leading-relaxed whitespace-pre-wrap">{comment.text}</p>
+                            <p className="text-xs text-[var(--text-secondary,#a8a8b0)] leading-relaxed whitespace-pre-wrap">{comment.content}</p>
                             <p className="text-[10px] text-[var(--text-muted,#666670)] mt-1.5">
                               {new Date(comment.createdAt).toLocaleString()}
                             </p>

@@ -26,7 +26,7 @@ export default function CommentSection({ taskId }: Props) {
     const comment: Comment = {
       id: crypto.randomUUID(),
       taskId,
-      text: trimmed,
+      content: trimmed,
       createdAt: Date.now(),
     }
     const id = await createComment(comment)
@@ -65,7 +65,7 @@ export default function CommentSection({ taskId }: Props) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[10px] text-text-secondary mb-1">{fmt(c.createdAt)}</p>
-                <p className="text-xs text-text-primary leading-relaxed break-words">{c.text}</p>
+                <p className="text-xs text-text-primary leading-relaxed break-words">{c.content}</p>
               </div>
               {deletingId === c.id ? (
                 <div className="flex items-center gap-1 flex-shrink-0">

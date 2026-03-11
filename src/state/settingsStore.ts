@@ -20,6 +20,9 @@ export const DEFAULT_SETTINGS = {
     showAttachments:   true,
     showTypeLabel:     true,
     showAgingStripe:   true,
+    
+    // Column element visibility
+    showColumnTopBorder: true,
   },
 
   features: {

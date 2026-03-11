@@ -6,18 +6,15 @@
 export interface Theme {
   id:       string
   label:    string
-  // fontStack: full CSS font-family. First entry is Google Font (loaded lazily
-  //            if online), the rest are system fallbacks that work offline.
   fontStack:  string
-  fontUrl?:   string   // Google Fonts URL — only loaded when navigator.onLine
+  fontUrl?:   string
   tokens: Record<string, string>
 }
 
-// Helper to get theme token as CSS variable
 export const getThemeToken = (tokenName: string): string => `var(${tokenName}, var(--${tokenName}))`
 
 export const themes: Theme[] = [
-  // ── Default dark (Unchanged) ─────────────────────────────────────────────
+  // ── Dark (Default) ─────────────────────────────────────────────────────────
   {
     id:       "dark",
     label:    "Dark",
@@ -46,7 +43,94 @@ export const themes: Theme[] = [
     },
   },
 
-  // ── Midnight (Fixed: Soft blue-grey text, reduced glare) ────────────────
+  // ── Cosmic (Inspired by editor dark themes) ───────────────────────────────
+  {
+    id:       "cosmic",
+    label:    "Cosmic",
+    fontStack: "'JetBrains Mono', 'Inter', system-ui, -apple-system, sans-serif",
+    fontUrl:  "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap",
+    tokens: {
+      "--font-body":      "'JetBrains Mono', 'Inter', system-ui, -apple-system, sans-serif",
+      "--bg-app":         "#282c34",
+      "--bg-column":      "linear-gradient(180deg,#2c313a 0%,#252930 100%)",
+      "--bg-column-solid":"#2c313a",
+      "--bg-card":        "#333842",
+      "--bg-modal":       "#383d48",
+      "--bg-popover":     "#3e4451",
+      "--bg-input":       "rgba(150,160,170,0.1)",
+      "--border":         "rgba(150,160,170,0.15)",
+      "--border-hover":   "rgba(150,160,170,0.25)",
+      "--border-input":   "rgba(150,160,170,0.2)",
+      "--border-focus":   "rgba(97,174,228,0.5)",
+      "--text-primary":   "#abb2bf",
+      "--text-secondary": "#828997",
+      "--text-muted":     "#5c6370",
+      "--text-ghost":     "#3e4451",
+      "--accent":         "#61afef",
+      "--accent-muted":   "rgba(97,174,228,0.2)",
+      "--scrollbar":      "rgba(150,160,170,0.2)",
+    },
+  },
+
+  // ── Vampire (Dark purple-red theme) ───────────────────────────────────────
+  {
+    id:       "vampire",
+    label:    "Vampire",
+    fontStack: "'Fira Code', 'Inter', system-ui, -apple-system, sans-serif",
+    fontUrl:  "https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&display=swap",
+    tokens: {
+      "--font-body":      "'Fira Code', 'Inter', system-ui, -apple-system, sans-serif",
+      "--bg-app":         "#282a36",
+      "--bg-column":      "linear-gradient(180deg,#2d2f3d 0%,#252732 100%)",
+      "--bg-column-solid":"#2d2f3d",
+      "--bg-card":        "#343746",
+      "--bg-modal":       "#383b4a",
+      "--bg-popover":     "#44475a",
+      "--bg-input":       "rgba(98,114,164,0.15)",
+      "--border":         "rgba(98,114,164,0.2)",
+      "--border-hover":   "rgba(98,114,164,0.3)",
+      "--border-input":   "rgba(98,114,164,0.25)",
+      "--border-focus":   "rgba(139,233,253,0.5)",
+      "--text-primary":   "#f8f8f2",
+      "--text-secondary": "#b0b2c0",
+      "--text-muted":     "#6272a4",
+      "--text-ghost":     "#44475a",
+      "--accent":         "#8be9fd",
+      "--accent-muted":   "rgba(139,233,253,0.2)",
+      "--scrollbar":      "rgba(98,114,164,0.25)",
+    },
+  },
+
+  // ── Aurora (Northern lights theme) ────────────────────────────────────────
+  {
+    id:       "aurora",
+    label:    "Aurora",
+    fontStack: "'Inter', system-ui, -apple-system, sans-serif",
+    fontUrl:  "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
+    tokens: {
+      "--font-body":      "'Inter', system-ui, -apple-system, sans-serif",
+      "--bg-app":         "#2e3440",
+      "--bg-column":      "linear-gradient(180deg,#343b4a 0%,#2a303c 100%)",
+      "--bg-column-solid":"#343b4a",
+      "--bg-card":        "#3b4252",
+      "--bg-modal":       "#40485a",
+      "--bg-popover":     "#434c5e",
+      "--bg-input":       "rgba(94,106,124,0.2)",
+      "--border":         "rgba(94,106,124,0.25)",
+      "--border-hover":   "rgba(94,106,124,0.35)",
+      "--border-input":   "rgba(94,106,124,0.3)",
+      "--border-focus":   "rgba(136,192,208,0.5)",
+      "--text-primary":   "#eceff4",
+      "--text-secondary": "#d8dee9",
+      "--text-muted":     "#8890a6",
+      "--text-ghost":     "#4c566a",
+      "--accent":         "#88c0d0",
+      "--accent-muted":   "rgba(136,192,208,0.2)",
+      "--scrollbar":      "rgba(94,106,124,0.3)",
+    },
+  },
+
+  // ── Midnight ──────────────────────────────────────────────────────────────
   {
     id:       "midnight",
     label:    "Midnight",
@@ -65,7 +149,6 @@ export const themes: Theme[] = [
       "--border-hover":   "rgba(129,140,248,0.25)",
       "--border-input":   "rgba(129,140,248,0.20)",
       "--border-focus":   "rgba(129,140,248,0.50)",
-      // Text is now a soft blue-grey instead of bright white/blue
       "--text-primary":   "#c8cde0",
       "--text-secondary": "#8891a8",
       "--text-muted":     "#5a6075",
@@ -76,7 +159,7 @@ export const themes: Theme[] = [
     },
   },
 
-  // ── Forest (Fixed: Natural, muted green text, organic feel) ──────────────
+  // ── Forest ────────────────────────────────────────────────────────────────
   {
     id:       "forest",
     label:    "Forest",
@@ -95,7 +178,6 @@ export const themes: Theme[] = [
       "--border-hover":   "rgba(74,222,128,0.25)",
       "--border-input":   "rgba(74,222,128,0.20)",
       "--border-focus":   "rgba(74,222,128,0.50)",
-      // Text is a soft sage/moss green, much easier on the eyes
       "--text-primary":   "#c8d8c8",
       "--text-secondary": "#8fa08b",
       "--text-muted":     "#5a6a58",
@@ -106,7 +188,7 @@ export const themes: Theme[] = [
     },
   },
 
-  // ── Light (Fixed: Charcoal text, warmer paper-white backgrounds) ─────────
+  // ── Light (Default) ───────────────────────────────────────────────────────
   {
     id:       "light",
     label:    "Light",
@@ -114,7 +196,7 @@ export const themes: Theme[] = [
     fontUrl:  "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap",
     tokens: {
       "--font-body":      "'DM Sans', 'Inter', system-ui, -apple-system, sans-serif",
-      "--bg-app":         "#f8f8f8", // Softer than pure white
+      "--bg-app":         "#f8f8f8",
       "--bg-column":      "linear-gradient(180deg,#ffffff 0%,#f4f4f6 100%)",
       "--bg-column-solid":"#ffffff",
       "--bg-card":        "#ffffff",
@@ -125,7 +207,6 @@ export const themes: Theme[] = [
       "--border-hover":   "rgba(0,0,0,0.15)",
       "--border-input":   "rgba(0,0,0,0.12)",
       "--border-focus":   "rgba(14,165,233,0.40)",
-      // Text is dark charcoal, not harsh black (#000)
       "--text-primary":   "#2a2a2a",
       "--text-secondary": "#555555",
       "--text-muted":     "#888888",
@@ -136,33 +217,61 @@ export const themes: Theme[] = [
     },
   },
 
-  // ── Rose (Fixed: Dusty rose text, elegant and muted) ─────────────────────
+  // ── Horizon (Clean light theme) ──────────────────────────────────────────
   {
-    id:       "rose",
-    label:    "Rose",
-    fontStack: "'Lato', 'Georgia', serif",
-    fontUrl:  "https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap",
+    id:       "horizon",
+    label:    "Horizon",
+    fontStack: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    fontUrl:  "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap",
     tokens: {
-      "--font-body":      "'Lato', 'Georgia', serif",
-      "--bg-app":         "#130b0d",
-      "--bg-column":      "linear-gradient(180deg,#1a1012 0%,#140a0c 100%)",
-      "--bg-column-solid":"#180e10",
-      "--bg-card":        "#1e1316",
-      "--bg-modal":       "#22181b",
-      "--bg-popover":     "#281e21",
-      "--bg-input":       "rgba(251,113,133,0.08)",
-      "--border":         "rgba(251,113,133,0.15)",
-      "--border-hover":   "rgba(251,113,133,0.25)",
-      "--border-input":   "rgba(251,113,133,0.20)",
-      "--border-focus":   "rgba(251,113,133,0.50)",
-      // Text is dusty pink/mauve, very elegant
-      "--text-primary":   "#d8c8ca",
-      "--text-secondary": "#a88890",
-      "--text-muted":     "#6a5055",
-      "--text-ghost":     "#3a2830",
-      "--accent":         "#fb7185",
-      "--accent-muted":   "rgba(251,113,133,0.25)",
-      "--scrollbar":      "rgba(200,60,60,0.15)",
+      "--font-body":      "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      "--bg-app":         "#f6f8fa",
+      "--bg-column":      "linear-gradient(180deg,#ffffff 0%,#f3f5f7 100%)",
+      "--bg-column-solid":"#ffffff",
+      "--bg-card":        "#ffffff",
+      "--bg-modal":       "#ffffff",
+      "--bg-popover":     "#ffffff",
+      "--bg-input":       "rgba(208,215,222,0.3)",
+      "--border":         "rgba(208,215,222,0.6)",
+      "--border-hover":   "rgba(177,186,196,0.8)",
+      "--border-input":   "rgba(208,215,222,0.8)",
+      "--border-focus":   "rgba(9,105,218,0.3)",
+      "--text-primary":   "#1f2328",
+      "--text-secondary": "#656d76",
+      "--text-muted":     "#8c959f",
+      "--text-ghost":     "#d0d7de",
+      "--accent":         "#0969da",
+      "--accent-muted":   "rgba(9,105,218,0.1)",
+      "--scrollbar":      "rgba(177,186,196,0.4)",
+    },
+  },
+
+  // ── Daybreak (Bright morning theme) ───────────────────────────────────────
+  {
+    id:       "daybreak",
+    label:    "Daybreak",
+    fontStack: "'JetBrains Mono', 'Inter', system-ui, -apple-system, sans-serif",
+    fontUrl:  "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap",
+    tokens: {
+      "--font-body":      "'JetBrains Mono', 'Inter', system-ui, -apple-system, sans-serif",
+      "--bg-app":         "#fafafa",
+      "--bg-column":      "linear-gradient(180deg,#ffffff 0%,#f0f0f0 100%)",
+      "--bg-column-solid":"#ffffff",
+      "--bg-card":        "#ffffff",
+      "--bg-modal":       "#ffffff",
+      "--bg-popover":     "#f5f5f5",
+      "--bg-input":       "rgba(0,0,0,0.05)",
+      "--border":         "rgba(0,0,0,0.1)",
+      "--border-hover":   "rgba(0,0,0,0.18)",
+      "--border-input":   "rgba(0,0,0,0.15)",
+      "--border-focus":   "rgba(66,133,244,0.4)",
+      "--text-primary":   "#383a42",
+      "--text-secondary": "#4f525e",
+      "--text-muted":     "#a0a1a7",
+      "--text-ghost":     "#c8c8c8",
+      "--accent":         "#4284f4",
+      "--accent-muted":   "rgba(66,132,244,0.12)",
+      "--scrollbar":      "rgba(0,0,0,0.15)",
     },
   },
 ]

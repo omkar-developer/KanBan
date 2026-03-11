@@ -60,7 +60,7 @@ export default function TextInputDialog({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
       <div className="mb-6">
-        <label className="block text-zinc-500 text-sm mb-2" style={{ fontFamily: "'DM Sans', sans-serif" }}>{label}</label>
+        <label className="block text-sm mb-2" style={{ fontFamily: "var(--font-body, system-ui, sans-serif)", color: "var(--text-muted)" }}>{label}</label>
         <input
           ref={inputRef}
           type="text"
@@ -68,13 +68,50 @@ export default function TextInputDialog({
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="w-full bg-white/[0.04] border border-white/[0.09] rounded-lg px-4 py-3 text-zinc-200 placeholder-zinc-600 outline-none focus:border-white/25 focus:ring-1 focus:ring-white/10 transition-all"
+          className="w-full rounded-lg px-4 py-3 outline-none transition-all border"
+          style={{
+            backgroundColor: "var(--bg-input)",
+            borderColor: "var(--border)",
+            color: "var(--text-primary)",
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = "var(--border-focus)"
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = "var(--border)"
+          }}
         />
       </div>
       <button
         onClick={handleSubmit}
         disabled={!value.trim() || isSubmitting}
-        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-700 disabled:text-zinc-500 text-white px-4 py-3 rounded-lg font-semibold transition-all"
+        className="w-full px-4 py-3 rounded-lg font-semibold transition-all"
+        style={{
+          backgroundColor: !value.trim() || isSubmitting ? "var(--bg-input)" : "var(--accent)",
+          color: !value.trim() || isSubmitting ? "var(--text-muted)" : "#fff",
+          transform: "scale(1)",
+        }}
+        onMouseEnter={(e) => {
+          if (value.trim() && !isSubmitting) {
+            e.currentTarget.style.backgroundColor = "var(--accent-muted)"
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (value.trim() && !isSubmitting) {
+            e.currentTarget.style.backgroundColor = "var(--accent)"
+            e.currentTarget.style.transform = "scale(1)"
+          }
+        }}
+        onMouseDown={(e) => {
+          if (value.trim() && !isSubmitting) {
+            e.currentTarget.style.transform = "scale(0.98)"
+          }
+        }}
+        onMouseUp={(e) => {
+          if (value.trim() && !isSubmitting) {
+            e.currentTarget.style.transform = "scale(1)"
+          }
+        }}
       >
         {isSubmitting ? '...' : 'Confirm'}
       </button>

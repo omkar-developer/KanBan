@@ -80,12 +80,17 @@ export default function DropdownMenu({ items, onClose, anchorRef, align = "right
   return (
     <div
       ref={menuRef}
-      className="fixed z-[9999] min-w-[192px] rounded-xl border border-white/[0.09] shadow-2xl py-1 overflow-hidden"
-      style={{ background: "var(--bg-popover, #1c1c1c)", top: pos.top, left: pos.left }}
+      className="fixed z-[9999] min-w-[192px] rounded-xl shadow-2xl py-1 overflow-hidden"
+      style={{
+        background: "var(--bg-popover)",
+        border: "1px solid var(--border)",
+        top: pos.top,
+        left: pos.left
+      }}
     >
       {items.map((item, i) =>
         item.separator ? (
-          <div key={i} className="my-1 h-px bg-white/[0.06] mx-2" />
+          <div key={i} className="my-1 h-px mx-2" style={{ backgroundColor: "var(--border)" }} />
         ) : (
           <button
             key={i}
@@ -94,12 +99,42 @@ export default function DropdownMenu({ items, onClose, anchorRef, align = "right
             className={`
               w-full flex items-center gap-2.5 px-3 py-2 text-[12px] font-medium text-left transition
               ${item.disabled ? "opacity-30 pointer-events-none cursor-default" : "cursor-pointer"}
-              ${item.danger
-                ? "text-rose-400 hover:bg-rose-500/10"
-                : "text-[var(--text-secondary,#a8a8b0)] hover:bg-white/[0.06] hover:text-[var(--text-primary,#f0f0f0)]"
-              }
             `}
-            style={{ fontFamily: "'DM Sans', sans-serif" }}
+            style={{
+              fontFamily: "var(--font-body, system-ui, sans-serif)",
+              color: item.danger ? "var(--accent)" : "var(--text-secondary)",
+              backgroundColor: "transparent",
+              transform: "scale(1)",
+            }}
+            onMouseEnter={(e) => {
+              if (!item.disabled) {
+                e.currentTarget.style.backgroundColor = item.danger
+                  ? "rgba(251, 113, 133, 0.1)"
+                  : "var(--bg-input)"
+                e.currentTarget.style.color = item.danger
+                  ? "var(--accent)"
+                  : "var(--text-primary)"
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!item.disabled) {
+                e.currentTarget.style.backgroundColor = "transparent"
+                e.currentTarget.style.color = item.danger
+                  ? "var(--accent)"
+                  : "var(--text-secondary)"
+                e.currentTarget.style.transform = "scale(1)"
+              }
+            }}
+            onMouseDown={(e) => {
+              if (!item.disabled) {
+                e.currentTarget.style.transform = "scale(0.98)"
+              }
+            }}
+            onMouseUp={(e) => {
+              if (!item.disabled) {
+                e.currentTarget.style.transform = "scale(1)"
+              }
+            }}
           >
             {item.icon && (
               <span className="w-3.5 h-3.5 flex-shrink-0 flex items-center justify-center opacity-70">

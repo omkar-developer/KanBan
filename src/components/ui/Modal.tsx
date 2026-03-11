@@ -46,15 +46,16 @@ export default function Modal({ isOpen, onClose, children, title }: ModalProps) 
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm"
+      className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-sm"
+      style={{ backgroundColor: "rgba(0, 0, 0, 0.6)" }}
       onClick={handleBackdropClick}
     >
       <div
         ref={modalRef}
         className="rounded-xl p-6 w-[420px] shadow-2xl"
-        style={{ 
-          background: "var(--bg-modal)", 
-          border: "1px solid var(--border)" 
+        style={{
+          background: "var(--bg-modal)",
+          border: "1px solid var(--border)"
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -63,7 +64,21 @@ export default function Modal({ isOpen, onClose, children, title }: ModalProps) 
             <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>{title}</h2>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              className="p-2 rounded-lg transition-colors"
+              style={{ backgroundColor: "transparent", transform: "scale(1)" }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "var(--bg-input)"
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent"
+                e.currentTarget.style.transform = "scale(1)"
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = "scale(0.95)"
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = "scale(1)"
+              }}
               aria-label="Close modal"
             >
               <svg className="w-5 h-5" style={{ color: "var(--text-secondary)" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">

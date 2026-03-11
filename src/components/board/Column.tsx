@@ -19,6 +19,7 @@ import {
 import type { Column as ColumnType } from "../../models/Column"
 import type { Task, TaskPriority, TaskType } from "../../models/Task"
 import { useKanbanStore } from "../../state/kanbanStore"
+import { useSettingsStore } from "../../state/settingsStore"
 import TaskCard from "./TaskCard"
 import TaskModal from "../task/TaskModal"
 import DropdownMenu from "../ui/DropdownMenu"
@@ -82,6 +83,7 @@ export default function Column({ column, tasks, index }: Props) {
   const deleteColumn = useKanbanStore(s => s.deleteColumn)
   const createTask   = useKanbanStore(s => s.createTask)
   const updateTask   = useKanbanStore(s => s.updateTask)
+  const showColumnTopBorder = useSettingsStore(s => s.settings.ui.showColumnTopBorder)
 
   const [icon,           setIcon]           = useState(() => column.icon  ?? getDefaultIcon(column.name))
   const [iconColor,      setIconColor]      = useState(() => column.color ?? COLOR_OPTIONS[0].value)
@@ -307,12 +309,13 @@ export default function Column({ column, tasks, index }: Props) {
         <div
           ref={colProvided.innerRef}
           {...colProvided.draggableProps}
-          className="flex-shrink-0 flex flex-col rounded-2xl transition-all"
+          className="flex flex-col rounded-2xl transition-all"
           style={{
             ...colProvided.draggableProps.style,
             width: `${300 * width}px`,
             background: `var(--bg-column, linear-gradient(180deg,#161616 0%,#111 100%))`,
             border: `1px solid var(--border, rgba(255,255,255,0.06))`,
+            borderTop: showColumnTopBorder ? `3px solid ${iconColor}` : `1px solid var(--border, rgba(255,255,255,0.06))`,
             boxShadow: colSnapshot.isDragging
               ? "0 24px 48px rgba(0,0,0,0.7)"
               : "0 8px 32px rgba(0,0,0,0.4)",

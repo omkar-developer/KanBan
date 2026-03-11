@@ -16,7 +16,7 @@ interface Props {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[11px] font-semibold text-zinc-600 uppercase tracking-widest mb-3">
+    <p className="text-[11px] font-semibold uppercase tracking-widest mb-3" style={{ color: "var(--text-muted)" }}>
       {children}
     </p>
   )
@@ -32,13 +32,13 @@ function Row({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 py-3 border-b border-white/[0.05] last:border-0">
+    <div className="flex items-start justify-between gap-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-zinc-300" style={{ fontFamily: "var(--font-body, system-ui, sans-serif)" }}>
+        <p className="text-sm" style={{ fontFamily: "var(--font-body, system-ui, sans-serif)", color: "var(--text-primary)" }}>
           {label}
         </p>
         {hint && (
-          <p className="text-[11px] text-zinc-600 mt-0.5">{hint}</p>
+          <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>{hint}</p>
         )}
       </div>
       <div className="flex-shrink-0">{children}</div>
@@ -58,14 +58,31 @@ function Toggle({
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`relative w-9 h-5 rounded-full transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500 ${
-        checked ? "bg-sky-500" : "bg-white/[0.1]"
-      }`}
+      className="relative w-9 h-5 rounded-full transition-colors duration-200 focus-visible:outline focus-visible:outline-2"
+      style={{
+        backgroundColor: checked ? "var(--accent)" : "var(--bg-input)",
+        transform: "scale(1)",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = checked ? "var(--accent-muted)" : "var(--bg-column-solid)"
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = checked ? "var(--accent)" : "var(--bg-input)"
+        e.currentTarget.style.transform = "scale(1)"
+      }}
+      onMouseDown={(e) => {
+        e.currentTarget.style.transform = "scale(0.9)"
+      }}
+      onMouseUp={(e) => {
+        e.currentTarget.style.transform = "scale(1)"
+      }}
     >
       <span
-        className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-          checked ? "translate-x-4" : "translate-x-0"
-        }`}
+        className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full shadow-sm transition-transform duration-200"
+        style={{
+          backgroundColor: "#fff",
+          transform: checked ? "translateX(16px)" : "translateX(0)",
+        }}
       />
     </button>
   )
@@ -100,10 +117,21 @@ function NumberInput({
             onChange(parsed)
           }
         }}
-        className="w-16 bg-white/[0.04] border border-white/[0.09] rounded-lg px-2 py-1 text-sm text-zinc-200 outline-none focus:border-white/25 text-right [color-scheme:dark]"
-        style={{ fontFamily: "var(--font-body, system-ui, sans-serif)" }}
+        className="w-16 rounded-lg px-2 py-1 text-sm outline-none text-right [color-scheme:dark]"
+        style={{
+          fontFamily: "var(--font-body, system-ui, sans-serif)",
+          backgroundColor: "var(--bg-input)",
+          borderColor: "var(--border)",
+          color: "var(--text-primary)",
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.borderColor = "var(--border-focus)"
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.borderColor = "var(--border)"
+        }}
       />
-      {suffix && <span className="text-xs text-zinc-600">{suffix}</span>}
+      {suffix && <span className="text-xs" style={{ color: "var(--text-muted)" }}>{suffix}</span>}
     </div>
   )
 }
@@ -112,11 +140,23 @@ function ThemeCard({ theme, active, onSelect }: { theme: Theme; active: boolean;
   return (
     <button
       onClick={onSelect}
-      className={`flex flex-col gap-2 p-3 rounded-xl border transition-all text-left ${
-        active
-          ? "border-sky-500/50 bg-sky-500/[0.06]"
-          : "border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.02]"
-      }`}
+      className="flex flex-col gap-2 p-3 rounded-xl border transition-all text-left"
+      style={{
+        borderColor: active ? "var(--border-focus)" : "var(--border)",
+        backgroundColor: active ? "var(--accent-muted)" : "transparent",
+      }}
+      onMouseEnter={(e) => {
+        if (!active) {
+          e.currentTarget.style.borderColor = "var(--border-hover)"
+          e.currentTarget.style.backgroundColor = "var(--bg-column-solid)"
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!active) {
+          e.currentTarget.style.borderColor = "var(--border)"
+          e.currentTarget.style.backgroundColor = "transparent"
+        }
+      }}
     >
       {/* Mini board preview */}
       <div
@@ -135,18 +175,19 @@ function ThemeCard({ theme, active, onSelect }: { theme: Theme; active: boolean;
       {/* Label row */}
       <div className="flex items-center justify-between">
         <span
-          className="text-xs font-medium text-zinc-300"
-          style={{ fontFamily: theme.fontStack }}
+          className="text-xs font-medium"
+          style={{ fontFamily: theme.fontStack, color: "var(--text-primary)" }}
         >
           {theme.label}
         </span>
         {active && (
           <svg
-            className="w-3.5 h-3.5 text-sky-400 flex-shrink-0"
+            className="w-3.5 h-3.5 flex-shrink-0"
             viewBox="0 0 14 14"
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
+            style={{ color: "var(--accent)" }}
           >
             <path d="M2 7l4 4 6-6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -154,7 +195,7 @@ function ThemeCard({ theme, active, onSelect }: { theme: Theme; active: boolean;
       </div>
 
       {/* Font name */}
-      <span className="text-[10px] text-zinc-600">
+      <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
         {theme.fontStack.split(",")[0].replace(/'/g, "")}
       </span>
     </button>
@@ -218,6 +259,9 @@ function CardsTab() {
           </Row>
           <Row label="Aging stripe" hint="Right-edge colour that deepens as a card gets old">
             <Toggle checked={ui.showAgingStripe} onChange={v => setUi({ showAgingStripe: v })} />
+          </Row>
+          <Row label="Column top border" hint="Show colored top border on columns">
+            <Toggle checked={ui.showColumnTopBorder} onChange={v => setUi({ showColumnTopBorder: v })} />
           </Row>
         </div>
       </div>
@@ -317,20 +361,61 @@ function FeaturesTab() {
       <div>
         <SectionLabel>Reset</SectionLabel>
         {confirmReset ? (
-          <div className="rounded-xl border border-rose-500/25 bg-rose-500/[0.07] px-4 py-3 flex flex-col gap-3">
-            <p className="text-xs text-rose-300">
+          <div className="rounded-xl border px-4 py-3 flex flex-col gap-3"
+            style={{
+              borderColor: "var(--border-focus)",
+              backgroundColor: "var(--accent-muted)",
+            }}>
+            <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
               Reset all settings to defaults? This cannot be undone.
             </p>
             <div className="flex gap-2">
               <button
                 onClick={() => { reset(); setConfirmReset(false) }}
-                className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold text-rose-400 bg-rose-500/15 border border-rose-500/30 hover:bg-rose-500/25 transition"
+                className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition"
+                style={{
+                  backgroundColor: "var(--accent)",
+                  color: "#fff",
+                  transform: "scale(1)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--accent-muted)"
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--accent)"
+                  e.currentTarget.style.transform = "scale(1)"
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = "scale(0.98)"
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = "scale(1)"
+                }}
               >
                 Reset everything
               </button>
               <button
                 onClick={() => setConfirmReset(false)}
-                className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold text-zinc-400 bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.08] transition"
+                className="flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition"
+                style={{
+                  backgroundColor: "var(--bg-input)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border)",
+                  transform: "scale(1)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--bg-column-solid)"
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--bg-input)"
+                  e.currentTarget.style.transform = "scale(1)"
+                }}
+                onMouseDown={(e) => {
+                  e.currentTarget.style.transform = "scale(0.98)"
+                }}
+                onMouseUp={(e) => {
+                  e.currentTarget.style.transform = "scale(1)"
+                }}
               >
                 Cancel
               </button>
@@ -339,8 +424,31 @@ function FeaturesTab() {
         ) : (
           <button
             onClick={() => setConfirmReset(true)}
-            className="w-full py-2 rounded-xl text-sm text-zinc-600 border border-white/[0.06] hover:bg-rose-500/[0.06] hover:text-rose-400 hover:border-rose-500/20 transition"
-            style={{ fontFamily: "var(--font-body, system-ui, sans-serif)" }}
+            className="w-full py-2 rounded-xl text-sm border transition"
+            style={{
+              fontFamily: "var(--font-body, system-ui, sans-serif)",
+              borderColor: "var(--border)",
+              color: "var(--text-muted)",
+              backgroundColor: "transparent",
+              transform: "scale(1)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "var(--accent-muted)"
+              e.currentTarget.style.color = "var(--accent)"
+              e.currentTarget.style.borderColor = "var(--border-focus)"
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent"
+              e.currentTarget.style.color = "var(--text-muted)"
+              e.currentTarget.style.borderColor = "var(--border)"
+              e.currentTarget.style.transform = "scale(1)"
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.style.transform = "scale(0.98)"
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = "scale(1)"
+            }}
           >
             Reset to defaults
           </button>
@@ -366,25 +474,42 @@ export default function SettingsPanel({ isOpen, onClose }: Props) {
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)" }}
+      style={{ backgroundColor: "rgba(0, 0, 0, 0.72)", backdropFilter: "blur(4px)" }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-2xl border border-white/[0.09] shadow-2xl flex flex-col max-h-[90vh]"
-        style={{ background: "var(--bg-modal, #161616)" }}
+        className="w-full max-w-md rounded-2xl border shadow-2xl flex flex-col max-h-[90vh]"
+        style={{ background: "var(--bg-modal)", borderColor: "var(--border)" }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06] flex-shrink-0">
+        <div className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: "1px solid var(--border)" }}>
           <span
-            className="text-xs font-semibold text-zinc-600 uppercase tracking-widest"
-            style={{ fontFamily: "var(--font-body, system-ui, sans-serif)" }}
+            className="text-xs font-semibold uppercase tracking-widest"
+            style={{ fontFamily: "var(--font-body, system-ui, sans-serif)", color: "var(--text-muted)" }}
           >
             Settings
           </span>
           <button
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] transition"
+            className="w-7 h-7 flex items-center justify-center rounded-lg transition"
+            style={{ color: "var(--text-muted)", backgroundColor: "transparent", transform: "scale(1)" }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "var(--bg-input)"
+              e.currentTarget.style.color = "var(--text-primary)"
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "transparent"
+              e.currentTarget.style.color = "var(--text-muted)"
+              e.currentTarget.style.transform = "scale(1)"
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.style.transform = "scale(0.95)"
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = "scale(1)"
+            }}
             aria-label="Close settings"
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.75">
@@ -394,17 +519,36 @@ export default function SettingsPanel({ isOpen, onClose }: Props) {
         </div>
 
         {/* Tab bar */}
-        <div className="flex border-b border-white/[0.06] flex-shrink-0 px-1 pt-1">
+        <div className="flex" style={{ borderBottom: "1px solid var(--border)", padding: "4px 4px 0" }}>
           {TABS.map(t => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`flex-1 py-2 px-3 text-xs font-medium rounded-t-lg transition-colors ${
-                tab === t.id
-                  ? "text-zinc-200 border-b-2 border-sky-500"
-                  : "text-zinc-600 hover:text-zinc-400"
-              }`}
-              style={{ fontFamily: "var(--font-body, system-ui, sans-serif)" }}
+              className="flex-1 py-2 px-3 text-xs font-medium rounded-t-lg transition-colors"
+              style={{
+                fontFamily: "var(--font-body, system-ui, sans-serif)",
+                color: tab === t.id ? "var(--text-primary)" : "var(--text-muted)",
+                borderBottom: tab === t.id ? "2px solid var(--accent)" : "2px solid transparent",
+                backgroundColor: "transparent",
+                transform: "scale(1)",
+              }}
+              onMouseEnter={(e) => {
+                if (tab !== t.id) {
+                  e.currentTarget.style.color = "var(--text-secondary)"
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (tab !== t.id) {
+                  e.currentTarget.style.color = "var(--text-muted)"
+                  e.currentTarget.style.transform = "scale(1)"
+                }
+              }}
+              onMouseDown={(e) => {
+                e.currentTarget.style.transform = "scale(0.98)"
+              }}
+              onMouseUp={(e) => {
+                e.currentTarget.style.transform = "scale(1)"
+              }}
             >
               {t.label}
             </button>

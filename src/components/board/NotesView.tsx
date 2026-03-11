@@ -1,185 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react"
-import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Syntax highlighter — zero deps, covers JS/TS/Python/CSS/HTML/JSON/SQL/Bash
-// ─────────────────────────────────────────────────────────────────────────────
-
-type TT = "kw"|"str"|"cmt"|"num"|"op"|"fn"|"ty"|"tag"|"attr"|"pct"|"bi"|"pl"
-const TC: Record<TT, string> = {
-  kw:"#c792ea", str:"#c3e88d", cmt:"#546e7a", num:"#f78c6c",
-  op:"#89ddff",  fn:"#82aaff", ty:"#ffcb6b", tag:"#f07178",
-  attr:"#c792ea",pct:"#89ddff",bi:"#80cbc4", pl:"#e4e4e7",
-}
-const KW: Record<string,string[]> = {
-  js:  ["const","let","var","function","return","if","else","for","while","do","class","new","import","export","default","from","async","await","try","catch","finally","throw","typeof","instanceof","in","of","this","null","undefined","true","false","void","delete","switch","case","break","continue","extends","super","static","get","set","yield"],
-  ts:  ["const","let","var","function","return","if","else","for","while","do","class","new","import","export","default","from","async","await","try","catch","finally","throw","typeof","instanceof","in","of","this","null","undefined","true","false","void","delete","switch","case","break","continue","extends","super","static","get","set","yield","type","interface","enum","implements","readonly","namespace","declare","abstract","as","keyof","infer","never","any","unknown","string","number","boolean","object"],
-  py:  ["def","class","return","if","elif","else","for","while","import","from","as","try","except","finally","raise","with","in","not","and","or","is","lambda","yield","pass","break","continue","global","nonlocal","True","False","None","async","await","print","len","range","type","str","int","float","bool","list","dict","set","tuple"],
-  go:  ["func","var","const","type","struct","interface","import","package","return","if","else","for","range","switch","case","default","break","continue","go","chan","select","defer","map","make","new","len","cap","append","copy","delete","panic","recover","true","false","nil","string","int","float64","bool","error","any"],
-  rust:["fn","let","mut","const","struct","enum","impl","trait","pub","use","mod","crate","super","self","if","else","for","while","loop","match","return","true","false","None","Some","Ok","Err","String","Vec","Box","Option","Result","async","await","move","ref","where","type","dyn","unsafe","extern"],
-  sql: ["SELECT","FROM","WHERE","JOIN","LEFT","RIGHT","INNER","OUTER","ON","GROUP","BY","ORDER","HAVING","INSERT","INTO","UPDATE","SET","DELETE","CREATE","TABLE","DROP","ALTER","INDEX","PRIMARY","KEY","FOREIGN","REFERENCES","NOT","NULL","DISTINCT","AS","AND","OR","IN","LIKE","BETWEEN","LIMIT","OFFSET","UNION","ALL","VALUES","WITH","CASE","WHEN","THEN","END"],
-  bash:["if","then","else","elif","fi","for","while","do","done","case","esac","in","function","return","echo","exit","source","export","local","readonly","declare","cd","ls","mkdir","rm","cp","mv","cat","grep","sed","awk","find","chmod","sudo","apt","npm","git","curl","wget","set","unset","true","false"],
-  json:["true","false","null"],
-}
-const BUILTINS = new Set(["console","Math","Object","Array","String","Number","Boolean","Promise","JSON","Error","Date","RegExp","Map","Set","Symbol","parseInt","parseFloat","isNaN","setTimeout","setInterval","fetch","document","window","process","require","module","exports","print","len","range","super","self"])
-
-function tokenize(code: string, lang: string): Array<{t:TT, v:string}> {
-  const l = lang.toLowerCase()
-  const langKey = l==="typescript"||l==="tsx"?"ts":l==="javascript"||l==="jsx"?"js":l==="python"?"py":l==="shell"||l==="sh"?"bash":l
-  const kws = new Set(KW[langKey]||[])
-
-  // HTML/XML
-  if (l==="html"||l==="xml") {
-    const toks: Array<{t:TT,v:string}> = []
-    const re = /(<\/?[a-zA-Z][^>]*\/?>|<!--[\s\S]*?-->|"[^"]*"|'[^']*')/g
-    let last = 0, m
-    while ((m = re.exec(code))) {
-      if (m.index > last) toks.push({t:"pl",v:code.slice(last,m.index)})
-      const s = m[0]
-      if (s.startsWith("<!--")) toks.push({t:"cmt",v:s})
-      else if (s.startsWith("<")) {
-        // split tag into tag-name, attrs, brackets
-        toks.push({t:"tag",v:s})
-      } else toks.push({t:"str",v:s})
-      last = m.index + s.length
-    }
-    if (last < code.length) toks.push({t:"pl",v:code.slice(last)})
-    return toks
-  }
-
-  // CSS
-  if (l==="css"||l==="scss"||l==="less") {
-    const toks: Array<{t:TT,v:string}> = []
-    const re = /(\/\*[\s\S]*?\*\/|"[^"]*"|'[^']*'|#[0-9a-fA-F]{3,8}\b|\b\d+\.?\d*(?:px|em|rem|vh|vw|%|s|ms|deg)?\b|[a-zA-Z-]+(?=\s*:)|[:;{}(),])/g
-    let last=0, m
-    while ((m=re.exec(code))) {
-      if (m.index>last) toks.push({t:"pl",v:code.slice(last,m.index)})
-      const s=m[0]
-      if (s.startsWith("/*")) toks.push({t:"cmt",v:s})
-      else if (s.startsWith('"')||s.startsWith("'")) toks.push({t:"str",v:s})
-      else if (s.startsWith("#")) toks.push({t:"num",v:s})
-      else if (/^\d/.test(s)) toks.push({t:"num",v:s})
-      else if (/^[a-zA-Z-]+$/.test(s)) toks.push({t:"attr",v:s})
-      else toks.push({t:"pct",v:s})
-      last=m.index+s.length
-    }
-    if (last<code.length) toks.push({t:"pl",v:code.slice(last)})
-    return toks
-  }
-
-  // JSON
-  if (l==="json") {
-    const toks: Array<{t:TT,v:string}> = []
-    const re = /("(?:[^"\\]|\\.)*"\s*(?=:))|("(?:[^"\\]|\\.)*")|(true|false|null)|(-?\d+\.?\d*(?:[eE][+-]?\d+)?)|([{}\[\]:,])/g
-    let last=0, m
-    while ((m=re.exec(code))) {
-      if (m.index>last) toks.push({t:"pl",v:code.slice(last,m.index)})
-      if (m[1]) toks.push({t:"attr",v:m[1]})
-      else if (m[2]) toks.push({t:"str",v:m[2]})
-      else if (m[3]) toks.push({t:"kw",v:m[3]})
-      else if (m[4]) toks.push({t:"num",v:m[4]})
-      else toks.push({t:"pct",v:m[0]})
-      last=m.index+m[0].length
-    }
-    if (last<code.length) toks.push({t:"pl",v:code.slice(last)})
-    return toks
-  }
-
-  // General: JS/TS/Python/Go/Rust/SQL/Bash
-  const toks: Array<{t:TT,v:string}> = []
-  const patterns: Array<[TT, RegExp]> = [
-    ["cmt", /^(\/\/[^\n]*|\/\*[\s\S]*?\*\/|#[^\n]*(?:(?!bash))|--[^\n]*)/],
-    ["str", /^("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/],
-    ["num", /^-?\b\d+\.?\d*(?:[eE][+-]?\d+)?\b/],
-  ]
-  let pos=0
-  while (pos<code.length) {
-    // whitespace
-    if (/[ \t\n\r]/.test(code[pos])) {
-      let j=pos; while(j<code.length&&/[ \t\n\r]/.test(code[j]))j++
-      toks.push({t:"pl",v:code.slice(pos,j)}); pos=j; continue
-    }
-    // comment/string/number
-    let hit=false
-    for (const [type,re] of patterns) {
-      const m=code.slice(pos).match(re)
-      if (m) { toks.push({t:type,v:m[0]}); pos+=m[0].length; hit=true; break }
-    }
-    if (hit) continue
-    // identifier
-    const idm = code.slice(pos).match(/^[a-zA-Z_$][a-zA-Z0-9_$]*/)
-    if (idm) {
-      const w=idm[0]
-      const isCall = code.slice(pos+w.length).match(/^\s*\(/)
-      const isType = /^[A-Z]/.test(w)
-      if (kws.has(w)) toks.push({t:"kw",v:w})
-      else if (BUILTINS.has(w)) toks.push({t:"bi",v:w})
-      else if (isCall) toks.push({t:"fn",v:w})
-      else if (isType) toks.push({t:"ty",v:w})
-      else toks.push({t:"pl",v:w})
-      pos+=w.length; continue
-    }
-    // operator / punct
-    const opm = code.slice(pos).match(/^(=>|\.\.\.|\?\?|[+\-*/%=!<>&|^~?]+)/)
-    if (opm) { toks.push({t:"op",v:opm[0]}); pos+=opm[0].length; continue }
-    const pctm = code.slice(pos).match(/^[{}[\]();,.:@]/)
-    if (pctm) { toks.push({t:"pct",v:pctm[0]}); pos+=pctm[0].length; continue }
-    toks.push({t:"pl",v:code[pos]}); pos++
-  }
-  return toks
-}
-
-function SyntaxCode({ code, lang }: { code: string; lang: string }) {
-  const tokens = useMemo(()=>tokenize(code,lang),[code,lang])
-  return (
-    <code style={{color:TC.pl,background:"none",border:"none",padding:0,fontSize:"inherit",fontFamily:"inherit"}}>
-      {tokens.map((tok,i)=><span key={i} style={{color:TC[tok.t]}}>{tok.v}</span>)}
-    </code>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Mermaid renderer — dynamic import, graceful fallback
-// ─────────────────────────────────────────────────────────────────────────────
-
-function MermaidDiagram({ code }: { code: string }) {
-  const [svg, setSvg] = useState<string|null>(null)
-  const [err, setErr] = useState<string|null>(null)
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        // Will work if user has `mermaid` in their project's node_modules
-        const mermaid = (await import("mermaid" as any)).default
-        mermaid.initialize({ startOnLoad:false, theme:"dark", darkMode:true,
-          themeVariables:{ background:"transparent", primaryColor:"#3b82f6",
-            primaryTextColor:"#e4e4e7", lineColor:"#52525b", edgeLabelBackground:"#1c1c1c" }})
-        const id = "mmd-"+Math.random().toString(36).slice(2)
-        const { svg: rendered } = await mermaid.render(id, code)
-        if (!cancelled) setSvg(rendered)
-      } catch(e:any) {
-        if (!cancelled) setErr(e?.message||"Mermaid not available. Run: npm install mermaid")
-      }
-    })()
-    return () => { cancelled=true }
-  }, [code])
-
-  if (err) return (
-    <div style={{border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,backgroundColor:"rgba(239,68,68,0.06)",padding:"10px 14px",marginBottom:14}}>
-      <p style={{fontSize:11,color:"#ef4444",fontWeight:600,marginBottom:4}}>Mermaid error</p>
-      <pre style={{fontSize:12,color:"#a1a1aa",margin:0,whiteSpace:"pre-wrap"}}>{err}</pre>
-      <pre style={{fontSize:12,color:"rgba(255,255,255,0.3)",marginTop:8,padding:"8px 10px",backgroundColor:"rgba(0,0,0,0.3)",borderRadius:6}}>{code}</pre>
-    </div>
-  )
-  if (!svg) return (
-    <div style={{backgroundColor:"rgba(0,0,0,0.25)",borderRadius:8,padding:"20px 16px",marginBottom:14,textAlign:"center",border:"1px solid var(--border)"}}>
-      <span style={{fontSize:12,color:"var(--text-muted)"}}>Rendering diagram…</span>
-    </div>
-  )
-  return <div style={{marginBottom:14,display:"flex",justifyContent:"center",overflowX:"auto"}} dangerouslySetInnerHTML={{__html:svg}} />
-}
-import type { Task } from "../../models/Task"
+import MarkdownPreview from "../ui/MarkdownPreview"  // ← extracted component (LaTeX + GFM + Mermaid)
 import { useKanbanStore } from "../../state/kanbanStore"
 import { tagColorClasses } from "../../utils/tagColors"
 import ExplorerTree from "../ui/ExplorerTree"
@@ -359,276 +179,12 @@ function smartEnter(value: string, selStart: number): { newValue: string; newCur
   return null
 }
 
-// Replace [[wiki links]] in markdown text before rendering
-function processWikiLinks(text: string): string {
-  return text.replace(/\[\[([^\]]+)\]\]/g, (_match, title) =>
-    `[${title}](wiki:${encodeURIComponent(title)})`
-  )
-}
-
 // Word count helper
 function wordCount(text: string) {
   const words = text.trim() ? text.trim().split(/\s+/).length : 0
   const chars = text.length
   const lines = text.split("\n").length
   return { words, chars, lines }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Markdown renderer with full GFM + syntax highlight + wiki links
-// ─────────────────────────────────────────────────────────────────────────────
-
-function MarkdownPreview({
-  content,
-  onWikiLinkClick,
-}: {
-  content: string
-  onWikiLinkClick: (title: string) => void
-}) {
-  const processed = useMemo(() => processWikiLinks(content), [content])
-
-  return (
-    <div
-      className="prose-notes"
-      style={{
-        color: "var(--text-primary)",
-        fontFamily: "'DM Sans', sans-serif",
-        fontSize: 15,
-        lineHeight: 1.75,
-      }}
-    >
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          // Headings
-          h1: ({ children }) => (
-            <h1 style={{
-              fontSize: 26, fontWeight: 700, marginTop: 28, marginBottom: 12,
-              color: "var(--text-primary)", borderBottom: "1px solid var(--border)",
-              paddingBottom: 8, letterSpacing: "-0.02em",
-            }}>{children}</h1>
-          ),
-          h2: ({ children }) => (
-            <h2 style={{
-              fontSize: 20, fontWeight: 650, marginTop: 24, marginBottom: 10,
-              color: "var(--text-primary)", letterSpacing: "-0.015em",
-            }}>{children}</h2>
-          ),
-          h3: ({ children }) => (
-            <h3 style={{
-              fontSize: 16, fontWeight: 650, marginTop: 20, marginBottom: 8,
-              color: "var(--text-primary)",
-            }}>{children}</h3>
-          ),
-          h4: ({ children }) => (
-            <h4 style={{
-              fontSize: 14, fontWeight: 600, marginTop: 16, marginBottom: 6,
-              color: "var(--text-secondary)",
-            }}>{children}</h4>
-          ),
-          // Paragraphs
-          p: ({ children }) => (
-            <p style={{ marginTop: 0, marginBottom: 14, color: "var(--text-primary)" }}>{children}</p>
-          ),
-          // Links — handle wiki: scheme
-          a: ({ href, children }) => {
-            if (href?.startsWith("wiki:")) {
-              const title = decodeURIComponent(href.slice(5))
-              return (
-                <button
-                  onClick={() => onWikiLinkClick(title)}
-                  style={{
-                    color: "var(--accent, #60a5fa)",
-                    textDecoration: "underline",
-                    textDecorationStyle: "dotted",
-                    background: "none", border: "none", cursor: "pointer",
-                    padding: 0, font: "inherit",
-                  }}
-                >
-                  {children}
-                </button>
-              )
-            }
-            return (
-              <a href={href} target="_blank" rel="noopener noreferrer"
-                style={{ color: "var(--accent, #60a5fa)", textDecoration: "underline" }}>
-                {children}
-              </a>
-            )
-          },
-          // Lists
-          ul: ({ children }) => (
-            <ul style={{ paddingLeft: 20, marginBottom: 14, listStyleType: "disc" }}>{children}</ul>
-          ),
-          ol: ({ children }) => (
-            <ol style={{ paddingLeft: 20, marginBottom: 14, listStyleType: "decimal" }}>{children}</ol>
-          ),
-          li: ({ children, ...props }) => {
-            // Task list items
-            const isTask = (props as any).className === "task-list-item"
-            return (
-              <li style={{
-                marginBottom: 4,
-                color: "var(--text-primary)",
-                listStyleType: isTask ? "none" : undefined,
-                marginLeft: isTask ? -4 : undefined,
-              }}>
-                {children}
-              </li>
-            )
-          },
-          // Checkbox input in task lists
-          input: ({ type, checked }) => {
-            if (type === "checkbox") {
-              return (
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  readOnly
-                  style={{
-                    marginRight: 6,
-                    accentColor: "var(--accent, #60a5fa)",
-                    cursor: "default",
-                  }}
-                />
-              )
-            }
-            return null
-          },
-          // Blockquote
-          blockquote: ({ children }) => (
-            <blockquote style={{
-              borderLeft: "3px solid var(--accent, #60a5fa)",
-              paddingLeft: 16, marginLeft: 0, marginBottom: 14,
-              color: "var(--text-secondary)",
-              backgroundColor: "rgba(96,165,250,0.05)",
-              borderRadius: "0 6px 6px 0",
-              padding: "8px 16px",
-            }}>
-              {children}
-            </blockquote>
-          ),
-          // Inline code
-          code: ({ inline, children, className }: any) => {
-            if (inline) {
-              return (
-                <code style={{
-                  backgroundColor: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 4, padding: "1px 6px",
-                  fontSize: "0.87em",
-                  fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                  color: "#e2b06a",
-                }}>
-                  {children}
-                </code>
-              )
-            }
-            const lang = (className || "").replace("language-", "").toLowerCase()
-            const code = String(children).replace(/\n$/, "")
-            // Mermaid — render as diagram
-            if (lang === "mermaid") return <MermaidDiagram code={code} />
-            return (
-              <div style={{ position: "relative", marginBottom: 16 }}>
-                {lang && (
-                  <div style={{
-                    position: "absolute", top: 10, right: 12,
-                    fontSize: 10, fontWeight: 600, letterSpacing: "0.07em",
-                    color: "rgba(255,255,255,0.25)", textTransform: "uppercase",
-                    fontFamily: "'DM Sans', sans-serif", userSelect: "none", pointerEvents: "none",
-                  }}>
-                    {lang}
-                  </div>
-                )}
-                <pre style={{
-                  backgroundColor: "rgba(0,0,0,0.45)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  borderRadius: 10,
-                  padding: "14px 18px",
-                  overflowX: "auto",
-                  fontSize: 13,
-                  lineHeight: 1.7,
-                  fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-                  margin: 0,
-                }}>
-                  <SyntaxCode code={code} lang={lang || "plain"} />
-                </pre>
-              </div>
-            )
-          },
-          // Table
-          table: ({ children }) => (
-            <div style={{ overflowX: "auto", marginBottom: 16 }}>
-              <table style={{
-                width: "100%", borderCollapse: "collapse",
-                fontSize: 14,
-              }}>
-                {children}
-              </table>
-            </div>
-          ),
-          thead: ({ children }) => (
-            <thead style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>{children}</thead>
-          ),
-          th: ({ children }) => (
-            <th style={{
-              padding: "8px 12px", textAlign: "left",
-              color: "var(--text-secondary)", fontWeight: 600, fontSize: 12,
-              textTransform: "uppercase", letterSpacing: "0.05em",
-              borderBottom: "1px solid var(--border)",
-            }}>
-              {children}
-            </th>
-          ),
-          td: ({ children }) => (
-            <td style={{
-              padding: "8px 12px",
-              color: "var(--text-primary)",
-              borderBottom: "1px solid rgba(255,255,255,0.04)",
-            }}>
-              {children}
-            </td>
-          ),
-          tr: ({ children }) => (
-            <tr style={{ transition: "background-color 0.1s" }}
-              onMouseEnter={e => (e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.02)")}
-              onMouseLeave={e => (e.currentTarget.style.backgroundColor = "transparent")}
-            >
-              {children}
-            </tr>
-          ),
-          // HR — use div so it always renders (border-only hr can collapse)
-          hr: () => (
-            <div style={{
-              display: "block",
-              height: 1,
-              backgroundColor: "rgba(255,255,255,0.12)",
-              border: "none",
-              margin: "28px 0",
-            }} />
-          ),
-          // Strong / Em
-          strong: ({ children }) => (
-            <strong style={{ fontWeight: 700, color: "var(--text-primary)" }}>{children}</strong>
-          ),
-          em: ({ children }) => (
-            <em style={{ fontStyle: "italic", color: "var(--text-secondary)" }}>{children}</em>
-          ),
-          // Images
-          img: ({ src, alt }) => (
-            <img src={src} alt={alt}
-              style={{
-                maxWidth: "100%", borderRadius: 8,
-                border: "1px solid var(--border)",
-                margin: "8px 0",
-              }} />
-          ),
-        }}
-      >
-        {processed}
-      </ReactMarkdown>
-    </div>
-  )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -733,6 +289,24 @@ export default function NotesView() {
     return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
   }, [noteContent, noteTags, isDirty, selectedNoteId])
 
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const handleContentChange = (val: string) => {
+    setNoteContent(val)
+    setIsDirty(true)
+  }
+
+  const handleSaveNow = useCallback(async () => {
+    if (!selectedNoteId) return
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+    setIsSaving(true)
+    await useKanbanStore.getState().updateTask(selectedNoteId, {
+      description: noteContent.trim() || undefined,
+      tags: noteTags.length > 0 ? noteTags : undefined,
+    })
+    setIsSaving(false)
+    setIsDirty(false)
+  }, [selectedNoteId, noteContent, noteTags])
+
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -752,112 +326,136 @@ export default function NotesView() {
     }
     document.addEventListener("keydown", handler)
     return () => document.removeEventListener("keydown", handler)
-  }, [focusMode, noteContent, noteTags, selectedNoteId]) // eslint-disable-line
+  }, [focusMode, noteContent, noteTags, selectedNoteId, handleSaveNow])
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
-  const handleContentChange = (val: string) => {
-    setNoteContent(val)
-    setIsDirty(true)
-  }
-
-  const handleSaveNow = useCallback(async () => {
-    if (!selectedNoteId) return
-    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
-    setIsSaving(true)
-    await useKanbanStore.getState().updateTask(selectedNoteId, {
-      description: noteContent.trim() || undefined,
-      tags: noteTags.length > 0 ? noteTags : undefined,
-    })
-    setIsSaving(false)
-    setIsDirty(false)
-  }, [selectedNoteId, noteContent, noteTags])
-
-  const handleExportPdf = useCallback(async () => {
+  const handleExportPdf = useCallback(() => {
     if (!selectedNote) return
     try {
-      // Create a print-friendly window
-      const printWindow = window.open('', '_blank')
-      if (!printWindow) {
-        alert('Please allow popups to export PDF')
-        return
+      const escapedMd = noteContent
+        .replace(/\\/g, '\\\\')
+        .replace(/`/g, '\\`')
+        .replace(/\$/g, '\\$')
+
+      const tagsHtml = noteTags.length > 0
+        ? noteTags.map(t => `<span class="tag">#${t}</span>`).join('') : ''
+
+      const metaParts = [
+        selectedNote.data?.category ? `<span>📁 ${selectedNote.data.category}</span>` : '',
+        `<span>🗓 ${new Date(selectedNote.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>`,
+        `<span>📝 ${noteContent.trim().split(/\s+/).filter(Boolean).length} words</span>`,
+      ].filter(Boolean).join(' &nbsp;·&nbsp; ')
+
+      const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${selectedNote.title}</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+    *, *::before, *::after { box-sizing: border-box; }
+    @page { margin: 20mm 22mm; }
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .print-bar { display: none !important; }
+    }
+    body { font-family: 'Inter', -apple-system, sans-serif; font-size: 15px; line-height: 1.75; color: #1a1a2e; max-width: 780px; margin: 0 auto; padding: 40px 20px 100px; background: #fff; }
+    .doc-header { margin-bottom: 32px; padding-bottom: 20px; border-bottom: 2px solid #e5e7eb; }
+    .doc-title { font-size: 30px; font-weight: 700; line-height: 1.2; color: #0f172a; margin: 0 0 10px; letter-spacing: -0.03em; }
+    .doc-meta { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
+    .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+    .tag { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 20px; background: #f0f4ff; color: #3b4fc8; border: 1px solid #c7d2f7; }
+    h1, h2, h3, h4, h5, h6 { font-weight: 700; line-height: 1.3; color: #0f172a; margin-top: 1.8em; margin-bottom: 0.5em; }
+    h1 { font-size: 24px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
+    h2 { font-size: 19px; } h3 { font-size: 16px; } h4 { font-size: 14px; color: #374151; }
+    p { margin: 0 0 1em; color: #1e293b; }
+    a { color: #2563eb; text-decoration: underline; }
+    strong { font-weight: 700; color: #0f172a; } em { font-style: italic; color: #374151; }
+    del { text-decoration: line-through; color: #9ca3af; }
+    code { font-family: 'JetBrains Mono', monospace; font-size: 0.875em; background: #f1f5f9; color: #be185d; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0; }
+    pre { background: #0f172a; border-radius: 8px; padding: 16px 18px; overflow-x: auto; margin: 1.2em 0; }
+    pre code { background: none; border: none; padding: 0; color: #e2e8f0; font-size: 13px; line-height: 1.6; }
+    blockquote { border-left: 3px solid #6366f1; background: #f8f9ff; margin: 1em 0; padding: 10px 16px; border-radius: 0 6px 6px 0; color: #475569; }
+    blockquote p { margin: 0; }
+    ul, ol { padding-left: 22px; margin: 0.6em 0 1em; } li { margin-bottom: 4px; color: #1e293b; }
+    ul li { list-style-type: disc; } ol li { list-style-type: decimal; }
+    input[type="checkbox"] { appearance: none; -webkit-appearance: none; width: 13px; height: 13px; border: 1.5px solid #9ca3af; border-radius: 3px; vertical-align: middle; margin-right: 5px; position: relative; top: -1px; background: #fff; }
+    input[type="checkbox"]:checked { background: #6366f1; border-color: #6366f1; }
+    .task-list-item { list-style: none; margin-left: -4px; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 14px; border: 1px solid #e2e8f0; }
+    th { background: #f8fafc; font-weight: 600; color: #374151; padding: 9px 12px; text-align: left; border-bottom: 2px solid #e2e8f0; }
+    td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; color: #1e293b; }
+    tr:last-child td { border-bottom: none; } tr:nth-child(even) td { background: #fafbfc; }
+    hr { border: none; border-top: 1px solid #e5e7eb; margin: 1.8em 0; }
+    img { max-width: 100%; border-radius: 6px; border: 1px solid #e2e8f0; margin: 6px 0; }
+    .print-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #0f172a; border-top: 1px solid #1e293b; padding: 10px 20px; display: flex; align-items: center; gap: 10px; z-index: 100; }
+    .print-bar-label { flex: 1; font-size: 12px; color: #94a3b8; }
+    .btn { border-radius: 7px; padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; border: none; }
+    .btn-print { background: #6366f1; color: #fff; }
+    .btn-print:hover { background: #4f46e5; }
+    .btn-dismiss { background: rgba(255,255,255,0.06); color: #94a3b8; border: 1px solid rgba(255,255,255,0.1) !important; }
+    .btn-dismiss:hover { background: rgba(255,255,255,0.1); color: #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="doc-header">
+    <div class="doc-title">${selectedNote.title}</div>
+    <div class="doc-meta">${metaParts}</div>
+    ${tagsHtml ? `<div class="tags">${tagsHtml}</div>` : ''}
+  </div>
+  <div id="content"></div>
+  <div class="print-bar">
+    <span class="print-bar-label">Use your browser's print dialog → "Save as PDF" to export.</span>
+    <button class="btn btn-dismiss" onclick="window.parent.document.getElementById('__pdf_frame__')?.remove();window.parent.document.getElementById('__pdf_close_btn__')?.remove()">✕ Close</button>
+    <button class="btn btn-print" onclick="window.print()">🖨&nbsp; Print / Save as PDF</button>
+  </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      try {
+        marked.use({ gfm: true, breaks: false })
+        const raw = \`${escapedMd}\`
+        const processed = raw.replace(/\\[\\[([^\\]]+)\\]\\]/g, '<span style="color:#6366f1;text-decoration:underline dotted">$1</span>')
+        document.getElementById('content').innerHTML = marked.parse(processed)
+        document.querySelectorAll('li').forEach(function(li) {
+          if (li.querySelector('input[type="checkbox"]')) li.classList.add('task-list-item')
+        })
+      } catch(e) {
+        document.getElementById('content').textContent = 'Render error: ' + e.message
       }
+    })
+  <\/script>
+</body>
+</html>`
 
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>${selectedNote.title} - TaskFlow</title>
-          <style>
-            @media print {
-              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            }
-            body {
-              font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-              line-height: 1.6;
-              color: #1a1a1a;
-              max-width: 800px;
-              margin: 40px auto;
-              padding: 20px;
-            }
-            h1 { font-size: 28px; margin-bottom: 8px; }
-            .meta { color: #666; font-size: 12px; margin-bottom: 24px; }
-            h1, h2, h3, h4, h5, h6 { margin-top: 24px; margin-bottom: 12px; }
-            p { margin: 12px 0; }
-            code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: 'JetBrains Mono', monospace; font-size: 0.9em; }
-            pre { background: #1a1a1a; color: #f8f8f2; padding: 16px; border-radius: 6px; overflow-x: auto; }
-            pre code { background: none; padding: 0; }
-            blockquote { border-left: 3px solid #ddd; padding-left: 16px; margin: 16px 0; color: #666; }
-            ul, ol { padding-left: 24px; margin: 12px 0; }
-            li { margin: 6px 0; }
-            a { color: #3b82f6; text-decoration: underline; }
-            hr { border: none; border-top: 1px solid #ddd; margin: 24px 0; }
-            table { border-collapse: collapse; width: 100%; margin: 16px 0; }
-            th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
-            th { background: #f5f5f5; }
-          </style>
-        </head>
-        <body>
-          <h1>${selectedNote.title}</h1>
-          <div class="meta">
-            ${selectedNote.data?.category ? `<span>Category: ${selectedNote.data.category}</span> · ` : ''}
-            <span>Created: ${new Date(selectedNote.createdAt).toLocaleDateString()}</span>
-            ${noteTags.length > 0 ? ` · Tags: ${noteTags.join(', ')}` : ''}
-          </div>
-          <div id="content"></div>
-        </body>
-        </html>
-      `
+      // Inject into a full-screen iframe on the current page — no popup blocker
+      const old = document.getElementById('__pdf_frame__')
+      if (old) old.remove()
+      const frame = document.createElement('iframe')
+      frame.id = '__pdf_frame__'
+      frame.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;border:none;z-index:99999;background:#fff;'
+      document.body.appendChild(frame)
+      const doc = frame.contentDocument || frame.contentWindow?.document
+      if (doc) { doc.open(); doc.write(htmlContent); doc.close() }
 
-      printWindow.document.write(htmlContent)
-      printWindow.document.close()
-
-      // Wait for content to render, then convert markdown to HTML
-      setTimeout(() => {
-        const contentDiv = printWindow.document.getElementById('content')
-        if (contentDiv) {
-          // Simple markdown to HTML conversion
-          let html = noteContent
-            .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-            .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-            .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-            .replace(/^#### (.*$)/gim, '<h4>$1</h4>')
-            .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
-            .replace(/\*(.*)\*/gim, '<em>$1</em>')
-            .replace(/`([^`]+)`/gim, '<code>$1</code>')
-            .replace(/\n- (.*$)/gim, '<li>$1</li>')
-            .replace(/\n\d+\. (.*$)/gim, '<li>$1</li>')
-            .replace(/\n\n/gim, '</p><p>')
-          
-          contentDiv.innerHTML = `<div>${html}</div>`
-        }
-        
-        // Trigger print dialog
-        printWindow.focus()
-        printWindow.print()
-      }, 500)
+      // Add a close button rendered outside the iframe so it always works
+      const closeBtn = document.createElement('button')
+      closeBtn.id = '__pdf_close_btn__'
+      closeBtn.textContent = '✕ Close'
+      closeBtn.style.cssText = [
+        'position:fixed', 'top:14px', 'right:20px', 'z-index:100000',
+        'background:rgba(15,23,42,0.95)', 'color:#e2e8f0',
+        'border:1px solid rgba(255,255,255,0.15)', 'border-radius:8px',
+        'padding:8px 16px', 'font-size:13px', 'font-weight:600',
+        'cursor:pointer', 'font-family:inherit', 'letter-spacing:-0.01em',
+        'box-shadow:0 4px 16px rgba(0,0,0,0.5)',
+      ].join(';')
+      closeBtn.onclick = () => {
+        document.getElementById('__pdf_frame__')?.remove()
+        document.getElementById('__pdf_close_btn__')?.remove()
+      }
+      document.body.appendChild(closeBtn)
     } catch (err) {
       console.error('Export failed:', err)
-      alert('Failed to export PDF')
     }
   }, [selectedNote, noteContent, noteTags])
 
@@ -889,7 +487,8 @@ export default function NotesView() {
     if (!colId && activeBoard) {
       await useKanbanStore.getState().createColumn(activeBoard.id, "Notes")
       const newCols = useKanbanStore.getState().columns
-      colId = newCols.find(c => c.boardId === activeBoard.id)?.id
+      const foundColId = newCols.find(c => c.boardId === activeBoard.id)?.id
+      if (foundColId) colId = foundColId
     }
     if (!colId) return
     await useKanbanStore.getState().createTask(colId, title.trim(), {
@@ -1252,8 +851,8 @@ export default function NotesView() {
                     {/* Export PDF */}
                     <HeaderBtn title="Export as PDF" onClick={handleExportPdf}>
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 14 14">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                          d="M12 10v6H2V4h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V10zM9 4v5h5" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M7 1.5v6m0 0L4.5 5m2.5 2.5L9.5 5" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M1.5 9.5v1A2 2 0 003.5 12.5h7a2 2 0 002-2v-1" />
                       </svg>
                     </HeaderBtn>
 
@@ -1423,7 +1022,7 @@ export default function NotesView() {
                         style={{
                           flex: 1,
                           width: "100%",
-                          minHeight: 0,
+                          height: "100%",
                           resize: "none", border: "none", outline: "none",
                           backgroundColor: "var(--bg-app)",
                           color: "var(--text-primary)", fontSize: 14, lineHeight: 1.75,
@@ -1431,7 +1030,6 @@ export default function NotesView() {
                           fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
                           caretColor: "var(--accent, #60a5fa)",
                           overflowY: "auto",
-                          display: "block",
                           boxSizing: "border-box",
                         }}
                       />

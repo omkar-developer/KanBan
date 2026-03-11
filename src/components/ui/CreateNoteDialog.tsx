@@ -110,7 +110,29 @@ export default function CreateNoteDialog({
           className="flex-1 px-4 py-3 rounded-lg font-semibold transition-all"
           style={{
             backgroundColor: (!noteTitle.trim() || isSubmitting) ? "var(--bg-input)" : "var(--accent)",
-            color: (!noteTitle.trim() || isSubmitting) ? "var(--text-muted)" : "#fff"
+            color: (!noteTitle.trim() || isSubmitting) ? "var(--text-muted)" : "#fff",
+            transform: "scale(1)",
+          }}
+          onMouseEnter={(e) => {
+            if (noteTitle.trim() && !isSubmitting) {
+              e.currentTarget.style.backgroundColor = "var(--accent-muted)"
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (noteTitle.trim() && !isSubmitting) {
+              e.currentTarget.style.backgroundColor = "var(--accent)"
+              e.currentTarget.style.transform = "scale(1)"
+            }
+          }}
+          onMouseDown={(e) => {
+            if (noteTitle.trim() && !isSubmitting) {
+              e.currentTarget.style.transform = "scale(0.98)"
+            }
+          }}
+          onMouseUp={(e) => {
+            if (noteTitle.trim() && !isSubmitting) {
+              e.currentTarget.style.transform = "scale(1)"
+            }
           }}
         >
           {isSubmitting ? 'Creating...' : 'Create Note'}
@@ -118,7 +140,20 @@ export default function CreateNoteDialog({
         <button
           onClick={onClose}
           className="flex-1 px-4 py-3 rounded-lg font-semibold transition-all"
-          style={{ backgroundColor: "var(--bg-input)", color: "var(--text-primary)" }}
+          style={{ backgroundColor: "var(--bg-input)", color: "var(--text-primary)", transform: "scale(1)" }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "var(--bg-column-solid)"
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "var(--bg-input)"
+            e.currentTarget.style.transform = "scale(1)"
+          }}
+          onMouseDown={(e) => {
+            e.currentTarget.style.transform = "scale(0.98)"
+          }}
+          onMouseUp={(e) => {
+            e.currentTarget.style.transform = "scale(1)"
+          }}
         >
           Cancel
         </button>
