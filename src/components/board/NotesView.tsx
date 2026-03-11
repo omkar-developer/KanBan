@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react"
-import MarkdownPreview from "../ui/MarkdownPreview"  // ← extracted component (LaTeX + GFM + Mermaid)
+import MarkdownPreview from "../ui/MarkdownPreview"
 import { useKanbanStore } from "../../state/kanbanStore"
 import { tagColorClasses } from "../../utils/tagColors"
 import ExplorerTree from "../ui/ExplorerTree"
@@ -8,6 +8,7 @@ import ConfirmDialog from "../ui/ConfirmDialog"
 import CreateNoteDialog from "../ui/CreateNoteDialog"
 import CategoryEditDialog from "../ui/CategoryEditDialog"
 import BacklinksSection from "../notes/BacklinksSection"
+import type { Task } from "../../models/Task"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants & helpers
@@ -218,8 +219,8 @@ export default function NotesView() {
   const [sidebarSearch,          setSidebarSearch]          = useState("")
   const [focusMode,              setFocusMode]              = useState(false)
 
-  const textareaRef   = useRef<HTMLTextAreaElement>(null)
-  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const textareaRef    = useRef<HTMLTextAreaElement>(null)
+  const autosaveTimer  = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Derived data ───────────────────────────────────────────────────────────
   const allNoteTasks = useMemo(() => tasks.filter(t => t.type === "note"), [tasks])
@@ -552,6 +553,7 @@ export default function NotesView() {
     }
   }
 
+  // ── Image paste / drag-and-drop ────────────────────────────────────────────
   // ── Toolbar action ─────────────────────────────────────────────────────────
   const applyToolbar = (toolbarItem: typeof TOOLBAR[0]) => {
     const ta = textareaRef.current
@@ -692,6 +694,58 @@ export default function NotesView() {
                       fontSize: 12, outline: "none",
                     }}
                   />
+                </div>
+              </div>
+            )}
+
+            {/* Collapsed icon strip — one avatar per note */}
+            {sidebarCollapsed && noteTasks.length > 0 && (
+              <div style={{ flex: 1, overflowY: "auto", padding: "6px 4px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                {noteTasks.map(task => {
+                  const isSelected = selectedNoteId === task.id
+                  const letters = task.title.trim().slice(0, 2).toUpperCase() || "?"
+                  return (
+                    <div
+                      key={task.id}
+                      title={task.title}
+                      onClick={() => { setSelectedNoteId(task.id); setViewMode(v => v === "edit" ? "edit" : "preview") }}
+                      style={{
+                        width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        cursor: "pointer",
+                        backgroundColor: isSelected ? "rgba(96,165,250,0.2)" : "rgba(255,255,255,0.05)",
+                        border: isSelected ? "1px solid rgba(96,165,250,0.4)" : "1px solid transparent",
+                        color: isSelected ? "var(--accent, #60a5fa)" : "var(--text-muted)",
+                        fontSize: 10, fontWeight: 700, letterSpacing: "0.04em",
+                        transition: "background-color 0.12s, border-color 0.12s, color 0.12s",
+                        userSelect: "none",
+                      }}
+                      onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.09)"; e.currentTarget.style.color = "var(--text-primary)" } }}
+                      onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.05)"; e.currentTarget.style.color = "var(--text-muted)" } }}
+                    >
+                      {letters}
+                    </div>
+                  )
+                })}
+                {/* New note button at bottom of strip */}
+                <div
+                  title="New note"
+                  onClick={() => { setPendingCategory(""); setShowCreateDialog(true) }}
+                  style={{
+                    width: 32, height: 32, borderRadius: 8, flexShrink: 0, marginTop: 4,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    cursor: "pointer",
+                    backgroundColor: "transparent",
+                    border: "1px dashed rgba(255,255,255,0.12)",
+                    color: "var(--text-muted)",
+                    transition: "background-color 0.12s, border-color 0.12s, color 0.12s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.backgroundColor = "rgba(96,165,250,0.1)"; e.currentTarget.style.borderColor = "rgba(96,165,250,0.3)"; e.currentTarget.style.color = "var(--accent, #60a5fa)" }}
+                  onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; e.currentTarget.style.color = "var(--text-muted)" }}
+                >
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 12 12" width={12} height={12}>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 2v8M2 6h8" />
+                  </svg>
                 </div>
               </div>
             )}
