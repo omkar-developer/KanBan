@@ -25,6 +25,9 @@ async function getDb() {
   return _db
 }
 
+// Export for backup purposes
+export { getDb }
+
 // ── Migrations ────────────────────────────────────────────────────────────────
 
 async function migrate(db: import("@tauri-apps/plugin-sql").default) {

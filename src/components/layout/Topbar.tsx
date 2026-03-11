@@ -12,6 +12,8 @@ import {
   downloadDatabaseBackup,
   parseDatabaseBackup,
   openFileInTauri,
+  importMdFolderTauri,
+  exportMdFolderTauri,
   isTauri,
   type DatabaseBackup,
 } from "../../utils/exportImport"
@@ -21,6 +23,7 @@ import type { Column } from "../../models/Column"
 import type { Task } from "../../models/Task"
 import type { Board } from "../../models/Board"
 import type { Comment } from "../../models/Comment"
+import { createId } from "../../utils/id"
 
 interface TopBarProps {
   boardName?: string
@@ -165,13 +168,13 @@ function IconBtn({
 }
 
 export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick }: TopBarProps) {
-  const [settingsOpen,        setSettingsOpen]        = useState(false)
-  const [filterOpen,          setFilterOpen]          = useState(false)
-  const [searchExpanded,      setSearchExpanded]      = useState(false)
-  const [searchInput,         setSearchInput]         = useState("")
-  const [importExportMenuOpen, setImportExportMenuOpen] = useState(false)
-  const [showRestoreDialog,   setShowRestoreDialog]   = useState(false)
-  const [pendingBackupData,   setPendingBackupData]   = useState<DatabaseBackup | null>(null)
+  const [settingsOpen,          setSettingsOpen]          = useState(false)
+  const [filterOpen,            setFilterOpen]            = useState(false)
+  const [searchExpanded,        setSearchExpanded]        = useState(false)
+  const [searchInput,           setSearchInput]           = useState("")
+  const [importExportMenuOpen,  setImportExportMenuOpen]  = useState(false)
+  const [showRestoreDialog,     setShowRestoreDialog]     = useState(false)
+  const [pendingBackupData,     setPendingBackupData]     = useState<DatabaseBackup | null>(null)
 
   const boards       = useKanbanStore(s => s.boards)
   const columns      = useKanbanStore(s => s.columns)
@@ -214,7 +217,7 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
 
   const handleSearchChange = (val: string) => {
     setSearchInput(val)
-    setSearchQuery(val) // live search — no Enter needed
+    setSearchQuery(val)
   }
 
   const clearSearch = () => {
@@ -230,22 +233,17 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
   const handleExport = async () => {
     if (!currentBoard) return
     await downloadBoardJSON(currentBoard, columns, tasks)
-    // Show browser notification if not Tauri (Tauri shows its own dialog)
     if (!isTauri()) {
       alert(`Board "${currentBoard.name}" exported successfully!\n\nCheck your Downloads folder.`)
     }
   }
 
   const handleBackup = async () => {
-    // Get all data from IndexedDB
-    const allBoards = await db.boards.toArray()
-    const allColumns = await db.columns.toArray()
-    const allTasks = await db.tasks.toArray()
+    const allBoards   = await db.boards.toArray()
+    const allColumns  = await db.columns.toArray()
+    const allTasks    = await db.tasks.toArray()
     const allComments = await db.comments.toArray()
-
     await downloadDatabaseBackup(allBoards, allColumns, allTasks, allComments)
-    
-    // Show browser notification if not Tauri (Tauri shows its own dialog)
     if (!isTauri()) {
       alert(`Database backup exported successfully!\n\nCheck your Downloads folder.`)
     }
@@ -253,16 +251,11 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
 
   const handleRestore = async () => {
     if (isTauri()) {
-      // Use Tauri's open dialog
       try {
         const content = await openFileInTauri()
         if (!content) return
-        
         const backup = parseDatabaseBackup(content)
-        if (!backup) {
-          alert("Invalid backup file format")
-          return
-        }
+        if (!backup) { alert("Invalid backup file format"); return }
         setPendingBackupData(backup)
         setShowRestoreDialog(true)
       } catch (err) {
@@ -270,7 +263,6 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
         alert("Failed to read backup file")
       }
     } else {
-      // Use browser file input
       const input = createFileINPUT()
       input.onchange = async (e) => {
         const file = (e.target as HTMLInputElement).files?.[0]
@@ -278,10 +270,7 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
         try {
           const content = await readFileAsText(file)
           const backup = parseDatabaseBackup(content)
-          if (!backup) {
-            alert("Invalid backup file format")
-            return
-          }
+          if (!backup) { alert("Invalid backup file format"); return }
           setPendingBackupData(backup)
           setShowRestoreDialog(true)
         } catch (err) {
@@ -296,44 +285,22 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
   const confirmRestore = async () => {
     if (!pendingBackupData) return
     try {
-      // Clear existing data
       await db.transaction("rw", db.boards, db.columns, db.tasks, db.comments, async () => {
         await db.boards.clear()
         await db.columns.clear()
         await db.tasks.clear()
         await db.comments.clear()
-
-        // Restore boards
-        for (const board of pendingBackupData.boards) {
-          await db.boards.add(board)
-        }
-        // Restore columns
-        for (const col of pendingBackupData.columns) {
-          await db.columns.add(col)
-        }
-        // Restore tasks
-        for (const task of pendingBackupData.tasks) {
-          await db.tasks.add(task)
-        }
-        // Restore comments
-        for (const comment of pendingBackupData.comments || []) {
-          await db.comments.add(comment)
-        }
+        for (const board   of pendingBackupData.boards)            await db.boards.add(board)
+        for (const col     of pendingBackupData.columns)           await db.columns.add(col)
+        for (const task    of pendingBackupData.tasks)             await db.tasks.add(task)
+        for (const comment of pendingBackupData.comments || [])    await db.comments.add(comment)
       })
-
-      // Reload the app data
       await loadBoards()
       setShowRestoreDialog(false)
       setPendingBackupData(null)
-      
-      // Show success notification
       if (isTauri()) {
-        try {
-          const { message } = await import('@tauri-apps/plugin-dialog')
-          await message('Database restored successfully!')
-        } catch {
-          alert("Database restored successfully!")
-        }
+        try { const { message } = await import("@tauri-apps/plugin-dialog"); await message("Database restored successfully!") }
+        catch { alert("Database restored successfully!") }
       } else {
         alert("Database restored successfully! The app will now reflect the restored data.")
       }
@@ -345,16 +312,11 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
 
   const handleImport = async () => {
     if (isTauri()) {
-      // Use Tauri's open dialog
       try {
         const content = await openFileInTauri()
         if (!content) return
-        
         const exported = parseExportJSON(content)
-        if (!exported) {
-          alert("Invalid file format")
-          return
-        }
+        if (!exported) { alert("Invalid file format"); return }
         const newBoardId = `board_${Date.now()}`
         await store.createBoard({ ...exported.board, id: newBoardId })
         const columnIds: Record<string, string> = {}
@@ -367,13 +329,13 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
           const newColId = columnIds[task.columnId]
           if (newColId) await store.createTask({ ...task, id: `task_${Date.now()}_${Math.random()}`, columnId: newColId } as Task)
         }
+        await loadBoards()
         alert(`Board "${exported.board.name}" imported successfully!`)
       } catch (err) {
         console.error("Import failed:", err)
         alert("Failed to import board")
       }
     } else {
-      // Use browser file input
       const input = createFileINPUT()
       input.onchange = async (e) => {
         const file = (e.target as HTMLInputElement).files?.[0]
@@ -394,6 +356,7 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
             const newColId = columnIds[task.columnId]
             if (newColId) await store.createTask({ ...task, id: `task_${Date.now()}_${Math.random()}`, columnId: newColId } as Task)
           }
+          await loadBoards()
           alert(`Board "${exported.board.name}" imported successfully!`)
         } catch (err) {
           console.error("Import failed:", err)
@@ -404,9 +367,102 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
     }
   }
 
+  // ── Import MD Folder ───────────────────────────────────────────────────────
+  // Only available in Tauri (needs fs access to read a directory).
+  // Creates a new "notes" type board. Each top-level folder becomes a column;
+  // .md files inside become note tasks. Files at the root level go into a
+  // column named after the folder itself.
+  const handleImportMdFolder = async () => {
+    if (!isTauri()) {
+      alert("Markdown folder import is only available in the desktop app.")
+      return
+    }
+    try {
+      const result = await importMdFolderTauri()
+      if (!result) return // user cancelled
+
+      if (result.columns.length === 0) {
+        alert("No markdown files found in the selected folder.")
+        return
+      }
+
+      // Create a new notes board named after the folder
+      const boardId = createId()
+      await store.createBoard({
+        id: boardId,
+        name: result.boardName,
+        type: "notes",
+        createdAt: Date.now(),
+      })
+
+      // Create columns and note tasks
+      let colOrder = 1000
+      for (const col of result.columns) {
+        const colId = createId()
+        await store.createColumn({
+          id: colId,
+          boardId,
+          name: col.name,
+          order: colOrder,
+        })
+        colOrder += 1000
+
+        let taskOrder = 1000
+        for (const file of col.files) {
+          await store.createTask({
+            id: createId(),
+            columnId: colId,
+            title: file.title,
+            description: file.content,
+            type: "note",
+            // NotesView groups by task.data.category, not by column
+            data: { category: col.name },
+            order: taskOrder,
+            createdAt: Date.now(),
+          } as Task)
+          taskOrder += 1000
+        }
+      }
+
+      await loadBoards()
+      alert(`Imported "${result.boardName}" — ${result.columns.length} column(s) created.`)
+    } catch (err) {
+      console.error("MD import failed:", err)
+      alert("Failed to import markdown folder.")
+    }
+  }
+
+  // ── Export as MD Folder ────────────────────────────────────────────────────
+  const handleExportMdFolder = async () => {
+    if (!isTauri()) {
+      alert("Markdown folder export is only available in the desktop app.")
+      return
+    }
+    if (!currentBoard) return
+    try {
+      await exportMdFolderTauri(currentBoard, columns, tasks)
+    } catch (err) {
+      console.error("MD export failed:", err)
+      alert("Failed to export as markdown folder.")
+    }
+  }
+
   // Stats for the board name area
   const totalTasks    = tasks.filter(t => !(t.data?.archived as boolean)).length
-  const archivedCount = tasks.filter(t => (t.data?.archived as boolean)).length
+  const archivedCount = tasks.filter(t =>  (t.data?.archived as boolean)).length
+
+  // Build dropdown items — MD options only in Tauri (need fs access)
+  const dropdownItems = [
+    { label: "Export Board",   onClick: handleExport },
+    { label: "Import Board",   onClick: handleImport },
+    ...(isTauri() ? [
+      { label: "Export as Markdown Folder", onClick: handleExportMdFolder },
+      { label: "Import Markdown Folder",    onClick: handleImportMdFolder },
+    ] : []),
+    { separator: true } as const,
+    { label: "Backup Database",  onClick: handleBackup  },
+    { label: "Restore Database", onClick: handleRestore },
+  ]
 
   return (
     <>
@@ -440,13 +496,7 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
             {boardName}
           </h1>
           {!isNotesBoard && (
-            <span
-              style={{
-                fontSize: 11,
-                color: "var(--text-muted)",
-                fontWeight: 500,
-              }}
-            >
+            <span style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 500 }}>
               {totalTasks} task{totalTasks !== 1 ? "s" : ""}
               {archivedCount > 0 && ` · ${archivedCount} archived`}
             </span>
@@ -537,13 +587,7 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
 
         {importExportMenuOpen && (
           <DropdownMenu
-            items={[
-              { label: "Export Board", onClick: handleExport },
-              { label: "Import Board", onClick: handleImport },
-              { separator: true } as const,
-              { label: "Backup Database", onClick: handleBackup },
-              { label: "Restore Database", onClick: handleRestore },
-            ]}
+            items={dropdownItems}
             onClose={() => setImportExportMenuOpen(false)}
             anchorRef={importExportMenuRef as React.RefObject<HTMLElement>}
             align="right"
@@ -563,7 +607,7 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
         />
       </div>
 
-      {/* ── Panels ───────────────────────────────────────────────────── */}
+      {/* ── Panels ───────────────────────────────────────────────── */}
       <FilterPanel
         isOpen={filterOpen}
         allTags={allTags}
@@ -621,12 +665,9 @@ function ArchivedToggle({ active, count, onClick }: { active: boolean; count: nu
         display: "flex", alignItems: "center", gap: 6,
         padding: "5px 10px", borderRadius: 8, border: "none", cursor: "pointer",
         transition: "background-color 0.15s, color 0.15s, border-color 0.15s",
-        backgroundColor: active
-          ? "rgba(113,113,122,0.18)"
-          : hov ? "rgba(255,255,255,0.05)" : "transparent",
+        backgroundColor: active ? "rgba(113,113,122,0.18)" : hov ? "rgba(255,255,255,0.05)" : "transparent",
         color: active ? "var(--text-secondary)" : hov ? "var(--text-primary)" : "var(--text-muted)",
-        fontSize: 12,
-        fontWeight: 500,
+        fontSize: 12, fontWeight: 500,
         fontFamily: "'DM Sans', sans-serif",
         outline: active ? "1px solid rgba(113,113,122,0.3)" : "none",
         flexShrink: 0,
@@ -639,8 +680,7 @@ function ArchivedToggle({ active, count, onClick }: { active: boolean; count: nu
           fontSize: 10, fontWeight: 700,
           backgroundColor: active ? "rgba(255,255,255,0.12)" : "rgba(113,113,122,0.2)",
           color: active ? "var(--text-secondary)" : "var(--text-muted)",
-          borderRadius: 10, padding: "1px 5px",
-          lineHeight: 1.6,
+          borderRadius: 10, padding: "1px 5px", lineHeight: 1.6,
         }}>{count}</span>
       )}
     </button>
@@ -659,12 +699,9 @@ function FilterBtn({ active, count, onClick }: { active: boolean; count: number;
         display: "flex", alignItems: "center", gap: 6,
         padding: "5px 10px", borderRadius: 8, border: "none", cursor: "pointer",
         transition: "background-color 0.15s, color 0.15s",
-        backgroundColor: active
-          ? "rgba(59,130,246,0.15)"
-          : hov ? "rgba(255,255,255,0.05)" : "transparent",
+        backgroundColor: active ? "rgba(59,130,246,0.15)" : hov ? "rgba(255,255,255,0.05)" : "transparent",
         color: active ? "var(--accent, #60a5fa)" : hov ? "var(--text-primary)" : "var(--text-muted)",
-        fontSize: 12,
-        fontWeight: 500,
+        fontSize: 12, fontWeight: 500,
         fontFamily: "'DM Sans', sans-serif",
         outline: active ? "1px solid rgba(59,130,246,0.3)" : "none",
         flexShrink: 0,
@@ -677,8 +714,7 @@ function FilterBtn({ active, count, onClick }: { active: boolean; count: number;
           fontSize: 10, fontWeight: 700,
           backgroundColor: "rgba(59,130,246,0.2)",
           color: "var(--accent, #60a5fa)",
-          borderRadius: 10, padding: "1px 5px",
-          lineHeight: 1.6,
+          borderRadius: 10, padding: "1px 5px", lineHeight: 1.6,
         }}>{count}</span>
       )}
     </button>

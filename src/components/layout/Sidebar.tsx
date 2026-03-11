@@ -145,7 +145,15 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
   const handleDeleteBoard = async () => {
     if (!deletingBoardId) return
     try {
+      // Check if the board being deleted is currently open
+      const isBoardOpen = deletingBoardId === useKanbanStore.getState().activeBoard?.id
       await useKanbanStore.getState().deleteBoard(deletingBoardId)
+      
+      // If the deleted board was open, notify parent to close it
+      if (isBoardOpen && onSelectBoard) {
+        onSelectBoard(null)
+      }
+      
       setDeletingBoardId(null)
     } catch (error) {
       console.error('[Sidebar] Error deleting board:', error)
@@ -185,6 +193,7 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
           style={{
             backgroundColor: 'var(--bg-input)',
             border: '1px solid transparent',
+            position: 'relative',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = 'var(--border)'
@@ -196,27 +205,42 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
           }}
         >
           {/* Icon */}
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0" style={{ zIndex: 1, position: 'relative' }}>
             {getBoardIcon(board)}
           </div>
 
-          {/* Name */}
-          <span 
+          {/* Name - allowed to overlap buttons */}
+          <span
             className="flex-1 text-sm font-medium truncate"
-            style={{ color: 'var(--text-primary)' }}
+            style={{ 
+              color: 'var(--text-primary)',
+              position: 'relative',
+              zIndex: 1,
+              marginRight: '-60px', // Allow overlap with buttons
+              paddingRight: '60px', // Add padding so text doesn't go under buttons
+            }}
           >
             {board.name}
           </span>
 
-          {/* Action buttons - visible on hover */}
+          {/* Action buttons - visible on hover, positioned absolutely */}
           {!isCollapsed && (
-            <div className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity">
+            <div 
+              className="flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity"
+              style={{ 
+                position: 'absolute',
+                right: '4px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                zIndex: 2,
+              }}
+            >
               <button
                 onClick={(e) => {
                   e.stopPropagation()
                   handleToggleFavorite(board.id, e)
                 }}
-                className="p-1.5 rounded transition-colors"
+                className="p-1.5 rounded transition-colors flex-shrink-0"
                 style={{ backgroundColor: "transparent" }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = "var(--bg-input)"
@@ -244,7 +268,7 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
                   e.stopPropagation()
                   setMenuOpenBoardId(isMenuOpen ? null : uniqueKey)
                 }}
-                className="p-1.5 rounded transition-colors"
+                className="p-1.5 rounded transition-colors flex-shrink-0"
                 style={{ backgroundColor: "transparent" }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = "var(--bg-input)"

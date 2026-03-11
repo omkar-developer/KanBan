@@ -5,7 +5,7 @@ import { useTheme } from "../../theme/useTheme"
 import type { Theme } from "../../theme/theme"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Tab = "appearance" | "cards" | "features"
+type Tab = "appearance" | "cards" | "features" | "backups"
 
 interface Props {
   isOpen: boolean
@@ -458,12 +458,179 @@ function FeaturesTab() {
   )
 }
 
+function BackupsTab() {
+  const { settings, update } = useSettingsStore()
+  const { backups } = settings
+  const [isRestoring, setIsRestoring] = useState(false)
+  const [restoreResult, setRestoreResult] = useState<{ success: boolean; message: string } | null>(null)
+
+  async function handleChooseFolder() {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog")
+      const selectedPath = await open({ directory: true })
+      if (selectedPath && typeof selectedPath === "string") {
+        update({ backups: { ...backups, cloudBackupPath: selectedPath } })
+      }
+    } catch (err) {
+      console.error("Failed to open folder picker:", err)
+    }
+  }
+
+  async function handleRestoreFromCloud() {
+    setIsRestoring(true)
+    setRestoreResult(null)
+    try {
+      const { restoreFromCloudBackup } = await import("../../hooks/useAutoBackup")
+      const success = await restoreFromCloudBackup()
+      setRestoreResult({
+        success,
+        message: success
+          ? "Database restored successfully. The app will now reload."
+          : "Failed to restore from cloud backup. Make sure cloud backup is enabled and a folder is selected.",
+      })
+      if (success) {
+        // Reload the app after a short delay
+        setTimeout(() => {
+          window.location.reload()
+        }, 1500)
+      }
+    } catch (err) {
+      setRestoreResult({ success: false, message: "An error occurred during restore." })
+    } finally {
+      setIsRestoring(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <SectionLabel>Cloud Backup</SectionLabel>
+        <div className="divide-y divide-white/[0.05]">
+          <Row label="Enable Cloud Backup" hint="Backup database to cloud folder on app close">
+            <Toggle
+              checked={backups.cloudBackupEnabled}
+              onChange={v => update({ backups: { ...backups, cloudBackupEnabled: v } })}
+            />
+          </Row>
+        </div>
+      </div>
+
+      <div>
+        <SectionLabel>Backup Folder</SectionLabel>
+        <div className="rounded-xl border px-4 py-4" style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-input)" }}>
+          <p className="text-xs mb-3" style={{ color: "var(--text-secondary)" }}>
+            Choose a folder in your cloud sync directory (OneDrive, Google Drive, Dropbox, etc.).
+            The database will be copied here automatically when you close the app.
+          </p>
+
+          <button
+            onClick={handleChooseFolder}
+            className="w-full py-2 px-3 rounded-lg text-sm font-medium transition mb-3"
+            style={{
+              fontFamily: "var(--font-body, system-ui, sans-serif)",
+              backgroundColor: "var(--accent)",
+              color: "#fff",
+              transform: "scale(1)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "var(--accent-muted)"
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "var(--accent)"
+              e.currentTarget.style.transform = "scale(1)"
+            }}
+            onMouseDown={(e) => {
+              e.currentTarget.style.transform = "scale(0.98)"
+            }}
+            onMouseUp={(e) => {
+              e.currentTarget.style.transform = "scale(1)"
+            }}
+          >
+            Choose Backup Folder
+          </button>
+
+          {backups.cloudBackupPath && (
+            <div className="mt-2 p-2 rounded-lg text-xs" style={{ backgroundColor: "var(--bg-column-solid)" }}>
+              <p className="truncate" style={{ color: "var(--text-muted)" }}>
+                {backups.cloudBackupPath}
+              </p>
+            </div>
+          )}
+
+          {restoreResult && (
+            <div
+              className="mt-3 p-3 rounded-lg text-xs"
+              style={{
+                backgroundColor: restoreResult.success ? "var(--accent-muted)" : "var(--bg-column-solid)",
+                color: restoreResult.success ? "var(--accent)" : "var(--text-secondary)",
+              }}
+            >
+              {restoreResult.message}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div>
+        <SectionLabel>Restore</SectionLabel>
+        <div className="rounded-xl border px-4 py-4" style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-input)" }}>
+          <p className="text-xs mb-3" style={{ color: "var(--text-secondary)" }}>
+            Restore your local database from the cloud backup. This will replace all current data.
+          </p>
+
+          <button
+            onClick={handleRestoreFromCloud}
+            disabled={isRestoring || !backups.cloudBackupPath}
+            className="w-full py-2 px-3 rounded-lg text-sm font-medium transition"
+            style={{
+              fontFamily: "var(--font-body, system-ui, sans-serif)",
+              backgroundColor: isRestoring || !backups.cloudBackupPath ? "var(--bg-column-solid)" : "var(--bg-card)",
+              color: isRestoring || !backups.cloudBackupPath ? "var(--text-muted)" : "var(--text-primary)",
+              border: "1px solid var(--border)",
+              transform: "scale(1)",
+              opacity: isRestoring || !backups.cloudBackupPath ? 0.6 : 1,
+            }}
+            onMouseEnter={(e) => {
+              if (!isRestoring && backups.cloudBackupPath) {
+                e.currentTarget.style.backgroundColor = "var(--accent-muted)"
+                e.currentTarget.style.color = "var(--accent)"
+                e.currentTarget.style.borderColor = "var(--border-focus)"
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isRestoring && backups.cloudBackupPath) {
+                e.currentTarget.style.backgroundColor = "var(--bg-card)"
+                e.currentTarget.style.color = "var(--text-primary)"
+                e.currentTarget.style.borderColor = "var(--border)"
+                e.currentTarget.style.transform = "scale(1)"
+              }
+            }}
+            onMouseDown={(e) => {
+              if (!isRestoring && backups.cloudBackupPath) {
+                e.currentTarget.style.transform = "scale(0.98)"
+              }
+            }}
+            onMouseUp={(e) => {
+              if (!isRestoring && backups.cloudBackupPath) {
+                e.currentTarget.style.transform = "scale(1)"
+              }
+            }}
+          >
+            {isRestoring ? "Restoring..." : "Restore From Cloud Backup"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main panel ────────────────────────────────────────────────────────────────
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "appearance", label: "Appearance" },
   { id: "cards",      label: "Cards" },
   { id: "features",   label: "Features" },
+  { id: "backups",    label: "Backups" },
 ]
 
 export default function SettingsPanel({ isOpen, onClose }: Props) {
@@ -562,6 +729,7 @@ export default function SettingsPanel({ isOpen, onClose }: Props) {
           {tab === "appearance" && <AppearanceTab />}
           {tab === "cards"      && <CardsTab />}
           {tab === "features"   && <FeaturesTab />}
+          {tab === "backups"    && <BackupsTab />}
         </div>
       </div>
     </div>,

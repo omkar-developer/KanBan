@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useEffect, useRef } from "react"
+import { useMemo, useState, useCallback, useEffect, useRef, type JSX } from "react"
 import MarkdownPreview from "../ui/MarkdownPreview"
 import { useKanbanStore } from "../../state/kanbanStore"
 import { tagColorClasses } from "../../utils/tagColors"
@@ -351,7 +351,7 @@ export default function NotesView() {
 <head>
   <meta charset="UTF-8">
   <title>${selectedNote.title}</title>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
     *, *::before, *::after { box-sizing: border-box; }
@@ -424,7 +424,7 @@ export default function NotesView() {
         document.getElementById('content').textContent = 'Render error: ' + e.message
       }
     })
-  <\/script>
+  </script>
 </body>
 </html>`
 
@@ -467,6 +467,14 @@ export default function NotesView() {
 
   const handleDeleteNote = async () => { setShowDeleteDialog(true) }
 
+  const handleToggleFavourite = async () => {
+    if (!selectedNoteId || !selectedNote) return
+    const isFav = !!(selectedNote.data?.favourite as boolean)
+    await useKanbanStore.getState().updateTask(selectedNoteId, {
+      data: { ...selectedNote.data, favourite: !isFav },
+    })
+  }
+
   const confirmDeleteNote = async () => {
     if (!selectedNoteId) return
     await useKanbanStore.getState().deleteTask(selectedNoteId)
@@ -483,32 +491,39 @@ export default function NotesView() {
   const handleCreateNote = (cat: string) => { setPendingCategory(cat); setShowCreateDialog(true) }
 
   const handleConfirmCreate = async (title: string, category: string) => {
-    if (!title.trim()) return
-    let colId = columns[0]?.id
-    if (!colId && activeBoard) {
-      await useKanbanStore.getState().createColumn(activeBoard.id, "Notes")
-      const newCols = useKanbanStore.getState().columns
-      const foundColId = newCols.find(c => c.boardId === activeBoard.id)?.id
-      if (foundColId) colId = foundColId
+    if (!title.trim() || !activeBoard) return
+    // Each category maps to a column of the same name — find or create it
+    const colName = category.trim() || "Notes"
+    let col = columns.find(c => c.boardId === activeBoard.id && c.name === colName)
+    if (!col) {
+      await useKanbanStore.getState().createColumn(activeBoard.id, colName)
+      col = useKanbanStore.getState().columns.find(c => c.boardId === activeBoard.id && c.name === colName)
     }
+    const colId = col?.id ?? columns.find(c => c.boardId === activeBoard.id)?.id
     if (!colId) return
     await useKanbanStore.getState().createTask(colId, title.trim(), {
-      type: "note", data: { category },
+      type: "note", data: { category: colName },
     })
     setShowCreateDialog(false)
-    // Auto-select the just-created note
     const newNote = useKanbanStore.getState().tasks.find(t => t.title === title.trim() && t.type === "note")
     if (newNote) setSelectedNoteId(newNote.id)
   }
 
-  const handleRenameCategory = (oldCat: string, newCat: string) => {
-    noteTasks
-      .filter(t => ((t.data?.category as string) === oldCat) || (!t.data?.category && oldCat === "Uncategorized"))
-      .forEach(async t => {
-        await useKanbanStore.getState().updateTask(t.id, {
-          data: { ...t.data, category: newCat === "Uncategorized" ? undefined : newCat }
-        })
+  const handleRenameCategory = async (oldCat: string, newCat: string) => {
+    // Update all notes in the category
+    const affected = noteTasks.filter(t =>
+      ((t.data?.category as string) === oldCat) || (!t.data?.category && oldCat === "Uncategorized")
+    )
+    for (const t of affected) {
+      await useKanbanStore.getState().updateTask(t.id, {
+        data: { ...t.data, category: newCat === "Uncategorized" ? undefined : newCat }
       })
+    }
+    // Also rename the matching column so column name stays in sync
+    if (activeBoard) {
+      const col = columns.find(c => c.boardId === activeBoard.id && c.name === oldCat)
+      if (col) await useKanbanStore.getState().updateColumn({ ...col, name: newCat })
+    }
     setEditingCategory(null)
   }
 
@@ -584,12 +599,17 @@ export default function NotesView() {
         onMouseEnter={e => { if (!isSelected) e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.04)" }}
         onMouseLeave={e => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent" }}
       >
-        <div style={{
-          fontSize: 13, fontWeight: isSelected ? 600 : 500,
-          color: isSelected ? "var(--text-primary)" : "var(--text-secondary)",
-          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-        }}>
-          {task.title || "Untitled Note"}
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          {!!(task.data?.favourite as boolean) && (
+            <span style={{ fontSize: 9, color: "#f59e0b", flexShrink: 0 }}>★</span>
+          )}
+          <div style={{
+            fontSize: 13, fontWeight: isSelected ? 600 : 500,
+            color: isSelected ? "var(--text-primary)" : "var(--text-secondary)",
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          }}>
+            {task.title || "Untitled Note"}
+          </div>
         </div>
         {task.description && (
           <div style={{
@@ -770,26 +790,64 @@ export default function NotesView() {
                     </button>
                   </div>
                 ) : (
+                  <>
+                  {/* ── Favourites section ───────────────────────────── */}
+                  {noteTasks.some(t => !!(t.data?.favourite as boolean)) && (() => {
+                    const favNotes = noteTasks.filter(t => !!(t.data?.favourite as boolean))
+                    return (
+                      <FavouritesSection
+                        notes={favNotes}
+                        selectedNoteId={selectedNoteId}
+                        onSelect={(id) => { setSelectedNoteId(id); setViewMode(v => v === "edit" ? "edit" : "preview") }}
+                        renderNoteItem={renderNoteItem}
+                      />
+                    )
+                  })()}
+
+                  {/* ── All categories ────────────────────────────────────── */}
                   <ExplorerTree<Task>
                     items={noteTasks}
                     groupKey={(item: Task) => (item.data?.category as string) || "Uncategorized"}
                     renderItem={renderNoteItem}
                     onCreate={handleCreateNote}
                     onItemSelect={(item) => { setSelectedNoteId(item.id); setViewMode(v => v === "edit" ? "edit" : "preview") }}
-                    renderGroupHeader={(groupLabel, groupItems, onCreate) => (
+                    renderGroupHeader={(groupLabel, groupItems, onCreate, isExpanded, onToggle) => (
                       <div
                         className="group"
-                        style={{
-                          display: "flex", alignItems: "center", gap: 4,
-                          padding: "6px 6px 3px",
-                        }}
+                        style={{ display: "flex", alignItems: "center", gap: 2, padding: "6px 6px 3px" }}
                       >
-                        <span style={{
-                          fontSize: 10, fontWeight: 700, textTransform: "uppercase",
-                          letterSpacing: "0.08em", color: "var(--text-muted)", flex: 1,
-                        }}>
+                        {/* Collapse chevron */}
+                        <button
+                          onClick={onToggle}
+                          title={isExpanded ? "Collapse" : "Expand"}
+                          style={{
+                            padding: 2, borderRadius: 4, border: "none", cursor: "pointer",
+                            backgroundColor: "transparent", color: "var(--text-muted)",
+                            display: "flex", alignItems: "center", flexShrink: 0,
+                            transition: "color 0.1s",
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)" }}
+                          onMouseLeave={e => { e.currentTarget.style.color = "var(--text-muted)" }}
+                        >
+                          <svg
+                            style={{ transition: "transform 0.15s", transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)" }}
+                            width={10} height={10} fill="none" stroke="currentColor" viewBox="0 0 10 10"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 2l4 3-4 3" />
+                          </svg>
+                        </button>
+
+                        <span
+                          onClick={onToggle}
+                          style={{
+                            fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+                            letterSpacing: "0.08em", color: "var(--text-muted)", flex: 1,
+                            cursor: "pointer", userSelect: "none",
+                          }}
+                        >
                           {groupLabel} <span style={{ fontWeight: 500, opacity: 0.7 }}>({groupItems.length})</span>
                         </span>
+
                         <button
                           onClick={() => setEditingCategory(groupLabel)}
                           title="Rename category"
@@ -803,8 +861,7 @@ export default function NotesView() {
                           onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = "var(--text-muted)" }}
                         >
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 12 12">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
-                              d="M8 1.5l2.5 2.5L3 11.5H0.5V9L8 1.5z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 1.5l2.5 2.5L3 11.5H0.5V9L8 1.5z" />
                           </svg>
                         </button>
                         <button
@@ -826,6 +883,7 @@ export default function NotesView() {
                       </div>
                     )}
                   />
+                  </>
                 )}
               </div>
             )}
@@ -941,6 +999,19 @@ export default function NotesView() {
                           d="M11 12H3a1 1 0 01-1-1V3a1 1 0 011-1h6l3 3v7a1 1 0 01-1 1z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75}
                           d="M9 12V8H5v4M5 2v3h5" />
+                      </svg>
+                    </HeaderBtn>
+
+                    {/* Favourite */}
+                    <HeaderBtn
+                      title={selectedNote.data?.favourite ? "Remove from favourites" : "Add to favourites"}
+                      active={!!(selectedNote.data?.favourite)}
+                      onClick={handleToggleFavourite}
+                    >
+                      <svg className="w-3.5 h-3.5" fill={selectedNote.data?.favourite ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 14 14"
+                        style={{ color: selectedNote.data?.favourite ? "#f59e0b" : undefined }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                          d="M7 1.5l1.6 3.3 3.6.5-2.6 2.5.6 3.6L7 9.6l-3.2 1.8.6-3.6L1.8 5.3l3.6-.5z" />
                       </svg>
                     </HeaderBtn>
 
@@ -1283,6 +1354,64 @@ function ViewToggleBtn({ active, onClick, children }: {
     >
       {children}
     </button>
+  )
+}
+
+// ─── Favourites section ──────────────────────────────────────────────────────
+
+function FavouritesSection({ notes, selectedNoteId, onSelect, renderNoteItem }: {
+  notes: import("../../models/Task").Task[]
+  selectedNoteId: string | undefined
+  onSelect: (id: string) => void
+  renderNoteItem: (task: import("../../models/Task").Task) => JSX.Element
+}) {
+  const [collapsed, setCollapsed] = useState(false)
+  return (
+    <div style={{ marginBottom: 4 }}>
+      {/* Header */}
+      <div
+        className="group"
+        style={{ display: "flex", alignItems: "center", gap: 2, padding: "6px 6px 3px" }}
+      >
+        <button
+          onClick={() => setCollapsed(v => !v)}
+          style={{
+            padding: 2, borderRadius: 4, border: "none", cursor: "pointer",
+            backgroundColor: "transparent", color: "#f59e0b",
+            display: "flex", alignItems: "center", flexShrink: 0,
+            transition: "color 0.1s",
+          }}
+        >
+          <svg
+            style={{ transition: "transform 0.15s", transform: collapsed ? "rotate(0deg)" : "rotate(90deg)" }}
+            width={10} height={10} fill="none" stroke="currentColor" viewBox="0 0 10 10"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 2l4 3-4 3" />
+          </svg>
+        </button>
+        <span
+          onClick={() => setCollapsed(v => !v)}
+          style={{
+            fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+            letterSpacing: "0.08em", color: "#f59e0b", flex: 1,
+            cursor: "pointer", userSelect: "none",
+          }}
+        >
+          ★ Favourites <span style={{ fontWeight: 500, opacity: 0.7 }}>({notes.length})</span>
+        </span>
+      </div>
+
+      {/* Items */}
+      {!collapsed && (
+        <div style={{ marginLeft: 20, paddingLeft: 12, borderLeft: "1px solid rgba(245,158,11,0.25)" }}>
+          {notes.map(note => (
+            <div key={note.id} onClick={() => onSelect(note.id)} style={{ cursor: "pointer" }}>
+              {renderNoteItem(note)}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

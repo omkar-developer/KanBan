@@ -30,6 +30,11 @@ export const DEFAULT_SETTINGS = {
     dueDateColors:     true,
     keyboardShortcuts: true,
   },
+
+  backups: {
+    cloudBackupEnabled: false,
+    cloudBackupPath:    null as string | null,
+  },
 }
 
 export type Settings = typeof DEFAULT_SETTINGS
@@ -54,6 +59,7 @@ export const useSettingsStore = create<SettingsStore>()(
             thresholds: { ...state.settings.thresholds, ...(patch.thresholds ?? {}) },
             ui:         { ...state.settings.ui,         ...(patch.ui         ?? {}) },
             features:   { ...state.settings.features,   ...(patch.features   ?? {}) },
+            backups:    { ...state.settings.backups,    ...(patch.backups    ?? {}) },
           },
         })),
 
@@ -71,6 +77,7 @@ export const useSettingsStore = create<SettingsStore>()(
             thresholds: { ...DEFAULT_SETTINGS.thresholds, ...(persisted?.settings?.thresholds ?? {}) },
             ui:         { ...DEFAULT_SETTINGS.ui,         ...(persisted?.settings?.ui         ?? {}) },
             features:   { ...DEFAULT_SETTINGS.features,   ...(persisted?.settings?.features   ?? {}) },
+            backups:    { ...DEFAULT_SETTINGS.backups,    ...(persisted?.settings?.backups    ?? {}) },
           },
         }
       },
