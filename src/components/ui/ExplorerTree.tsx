@@ -38,7 +38,7 @@ export default function ExplorerTree<T extends { id: string }>({
   }, {} as Record<string, T[]>)
 
   const toggleGroup = (groupLabel: string) => {
-    setExpandedGroups(prev => ({ ...prev, [groupLabel]: !prev[groupLabel] }))
+    setExpandedGroups(prev => ({ ...prev, [groupLabel]: !(prev[groupLabel] ?? true) }))
   }
 
   const sortedGroups = Object.entries(groupedItems).sort((a, b) => a[0].localeCompare(b[0]))
