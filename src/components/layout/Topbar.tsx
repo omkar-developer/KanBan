@@ -109,10 +109,22 @@ function IconClose() {
 }
 
 // ── View mode config ──────────────────────────────────────────────────────────
+function IconNotes() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+        d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+        d="M10 2v3h3M5 7h6M5 10h4" />
+    </svg>
+  )
+}
+
 const VIEW_MODES = [
-  { key: "board" as const, label: "Board",  Icon: IconBoard },
-  { key: "list"  as const, label: "List",   Icon: IconList  },
-  { key: "grid"  as const, label: "Grid",   Icon: IconGrid  },
+  { key: "board" as const, label: "Board",  Icon: IconBoard, notesOnly: false, hideForNotes: true  },
+  { key: "notes" as const, label: "Notes",  Icon: IconNotes, notesOnly: true,  hideForNotes: false },
+  { key: "list"  as const, label: "List",   Icon: IconList,  notesOnly: false, hideForNotes: false },
+  { key: "grid"  as const, label: "Grid",   Icon: IconGrid,  notesOnly: false, hideForNotes: false },
 ]
 
 // ── Separator ─────────────────────────────────────────────────────────────────
@@ -506,32 +518,34 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
         <Sep />
 
         {/* ── View mode switcher ──────────────────────────────────────── */}
-        {!isNotesBoard && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              backgroundColor: "var(--bg-popover)",
-              borderRadius: 8,
-              padding: 3,
-              border: "1px solid var(--border)",
-              gap: 1,
-              flexShrink: 0,
-            }}
-          >
-            {VIEW_MODES.map(({ key, label, Icon }) => {
-              const active = viewMode === key
-              return (
-                <ViewModeBtn key={key} active={active} label={label} onClick={() => setViewMode(key)}>
-                  <Icon />
-                </ViewModeBtn>
-              )
-            })}
-          </div>
-        )}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            backgroundColor: "var(--bg-popover)",
+            borderRadius: 8,
+            padding: 3,
+            border: "1px solid var(--border)",
+            gap: 1,
+            flexShrink: 0,
+          }}
+        >
+          {VIEW_MODES
+            .filter(({ notesOnly, hideForNotes }) =>
+              isNotesBoard ? !hideForNotes : !notesOnly
+            )
+            .map(({ key, label, Icon }) => {
+            const active = viewMode === key
+            return (
+              <ViewModeBtn key={key} active={active} label={label} onClick={() => setViewMode(key)}>
+                <Icon />
+              </ViewModeBtn>
+            )
+          })}
+        </div>
 
         {/* ── Show archived toggle (list + grid only) ─────────────────── */}
-        {!isNotesBoard && (viewMode === "list" || viewMode === "grid") && (
+        {(viewMode === "list" || viewMode === "grid") && (
           <>
             <Sep />
             <ArchivedToggle active={showArchived} count={archivedCount} onClick={() => setShowArchived(!showArchived)} />
@@ -539,12 +553,10 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
         )}
 
         {/* ── Filter button ───────────────────────────────────────────── */}
-        {!isNotesBoard && (
-          <>
-            <Sep />
-            <FilterBtn active={activeTags.length > 0} count={activeTags.length} onClick={() => setFilterOpen(!filterOpen)} />
-          </>
-        )}
+        <>
+          <Sep />
+          <FilterBtn active={activeTags.length > 0} count={activeTags.length} onClick={() => setFilterOpen(!filterOpen)} />
+        </>
 
         {/* ── Spacer ─────────────────────────────────────────────────── */}
         <div style={{ flex: 1 }} />

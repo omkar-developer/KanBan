@@ -30,7 +30,7 @@ export default function BoardView({ boardId }: Props) {
   const [showAddColumnDialog, setShowAddColumnDialog] = useState(false)
 
   const boardType    = activeBoard?.type || "kanban"
-  const isNotesBoard = boardType === "notes"
+  const isNotesBoard = viewMode === "notes" || boardType === "notes"
 
   const isArchived = (task: Task) => (task.data?.archived as boolean) === true
 
@@ -84,6 +84,23 @@ export default function BoardView({ boardId }: Props) {
 
   // ── Notes board ────────────────────────────────────────────────────────────
   if (isNotesBoard) {
+    if (viewMode === "list") {
+      return (
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column" }}>
+            <ListView />
+          </div>
+        </div>
+      )
+    }
+    if (viewMode === "grid") {
+      return (
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "20px 24px" }}>
+          <CardGridView />
+        </div>
+      )
+    }
+    // "notes" mode (or any other) → notes editor
     return (
       <div className="flex-1 min-h-0 overflow-hidden">
         <NotesView />

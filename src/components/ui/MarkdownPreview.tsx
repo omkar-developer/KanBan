@@ -475,11 +475,7 @@ export default function MarkdownPreview({ content, onWikiLinkClick }: MarkdownPr
           ),
 
           code: ({inline,children,className}:{inline?:boolean;children?:React.ReactNode;className?:string})=>{
-            if (inline) return (
-              <code style={{backgroundColor:inlineCodeBg,border:`1px solid ${inlineCodeBorder}`,borderRadius:4,padding:"1px 6px",fontSize:"0.87em",fontFamily:"'JetBrains Mono','Fira Code',monospace",color:inlineCodeColor}}>
-                {children}
-              </code>
-            )
+            if (inline) return <>{children}</>
             const lang=(className||"").replace("language-","").toLowerCase()
             const code=String(children).replace(/\n$/,"")
             if(lang==="mermaid") return <MermaidDiagram code={code} dark={dark}/>

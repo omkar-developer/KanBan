@@ -14,7 +14,7 @@ interface KanbanState {
   activeBoardId?: string
   activeTags:  string[] // Multi-select tag filter
   searchQuery: string // Global search query
-  viewMode:    'board' | 'list' | 'grid' | 'archive' // Current view mode
+  viewMode:    'board' | 'list' | 'grid' | 'archive' | 'notes' // Current view mode
   showArchived: boolean // Toggle to show archived tasks
 
   loadBoards:  () => Promise<void>
@@ -28,7 +28,7 @@ interface KanbanState {
   setSearchQuery: (query: string) => void
   
   // View mode
-  setViewMode: (mode: 'board' | 'list' | 'grid' | 'archive') => void
+  setViewMode: (mode: 'board' | 'list' | 'grid' | 'archive' | 'notes') => void
   
   // Archive toggle
   setShowArchived: (show: boolean) => void
@@ -58,7 +58,7 @@ interface KanbanState {
 }
 
 export const useKanbanStore = create<KanbanState>((set, get) => ({
-  boards: [], columns: [], tasks: [], activeBoard: undefined, activeTags: [], searchQuery: "", viewMode: 'board', showArchived: false,
+  boards: [], columns: [], tasks: [], activeBoard: undefined, activeTags: [], searchQuery: "", viewMode: (localStorage.getItem('kanban-last-board-type') === 'notes' ? 'notes' : 'board'), showArchived: false,
 
   async loadBoards() {
     const boards = await store.getBoards()
@@ -72,7 +72,7 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
   setSearchQuery: (query) => set({ searchQuery: query }),
   
   // View mode
-  setViewMode: (mode: 'board' | 'list' | 'grid' | 'archive') => set({ viewMode: mode }),
+  setViewMode: (mode: 'board' | 'list' | 'grid' | 'archive' | 'notes') => set({ viewMode: mode }),
   
   // Archive toggle
   setShowArchived: (show: boolean) => set({ showArchived: show }),

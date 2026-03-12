@@ -7,7 +7,7 @@ interface Props {
   children: React.ReactNode
   boardName?: string
   boardId?: string
-  onBoardChange?: (boardId: string | null) => void
+  onBoardChange?: (boardId: string | null, boardType?: "kanban" | "notes") => void
   onSettingsClick?: () => void
 }
 
