@@ -1,0 +1,341 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   ThemedMDEditor.css — Force @uiw/react-md-editor to use app CSS variables
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Kill the editor's own color scheme entirely ── */
+.w-md-editor,
+.w-md-editor *,
+.w-md-editor *::before,
+.w-md-editor *::after {
+  color-scheme: normal !important;
+}
+
+/* ── Container ── */
+.w-md-editor {
+  background-color: var(--bg-app) !important;
+  border-color: var(--border) !important;
+  color: var(--text-primary) !important;
+  box-shadow: none !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+  height: 100% !important;
+  max-height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative;
+  flex: 1 !important;
+  min-height: 0 !important;
+}
+
+/* Remove any inline background/color the editor sets on its children */
+.w-md-editor > div {
+  background-color: inherit !important;
+}
+
+/* ── Toolbar ── */
+.w-md-editor-toolbar {
+  background-color: var(--bg-column-solid, var(--bg-app)) !important;
+  border-bottom-color: var(--border) !important;
+  padding: 4px 6px !important;
+  display: flex !important;
+  gap: 1px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  height: auto !important;
+  flex-shrink: 0 !important;
+}
+
+.w-md-editor-toolbar ul {
+  display: flex !important;
+  gap: 1px !important;
+  align-items: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.w-md-editor-toolbar li {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.w-md-editor-toolbar li > button {
+  color: var(--text-muted) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 5px !important;
+  padding: 4px 7px !important;
+  font-size: 12px !important;
+  min-width: auto !important;
+  height: auto !important;
+  line-height: 1.4 !important;
+}
+
+.w-md-editor-toolbar li > button:hover {
+  color: var(--text-primary) !important;
+  background-color: rgba(255,255,255,0.08) !important;
+  border-color: rgba(255,255,255,0.15) !important;
+}
+
+.w-md-editor-toolbar li > button.active {
+  color: var(--accent, #60a5fa) !important;
+  background-color: rgba(96,165,255,0.12) !important;
+  border-color: rgba(96,165,255,0.25) !important;
+}
+
+.w-md-editor-toolbar li > button svg {
+  color: inherit !important;
+  fill: currentColor !important;
+}
+
+.w-md-editor-toolbar li.toolbar-divider {
+  border-left-color: var(--border) !important;
+  margin: 0 4px !important;
+  height: 18px !important;
+}
+
+/* ── Content area ── */
+.w-md-editor-content {
+  background-color: var(--bg-app) !important;
+  color: var(--text-primary) !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+/* ── Input wrapper (holds the textarea area) ── */
+.w-md-editor-input {
+  flex: 1 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* ── Scroll container ── */
+.w-md-editor-area {
+  flex: 1 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  position: relative !important;
+  overflow: auto !important;
+}
+
+/* ── Text container must fill the scroll area so the textarea can fill it ── */
+.w-md-editor-text {
+  min-height: 100% !important;
+}
+
+/* ── The actual textarea / CodeMirror editor ── */
+.w-md-editor textarea,
+.w-md-editor .cm-editor,
+.w-md-editor .cm-scroller,
+.w-md-editor .cm-content,
+.w-md-editor .cm-line,
+.w-md-editor .cm-gutters,
+.w-md-editor .cm-activeLine,
+.w-md-editor .cm-activeLineGutter,
+.w-md-editor .cm-cursor,
+.w-md-editor .cm-selectionBackground,
+.w-md-editor .cm-focused .cm-selectionBackground,
+.w-md-editor .w-md-editor-text-pre,
+.w-md-editor .w-md-editor-text-input,
+.w-md-editor .w-md-editor-text {
+  background-color: var(--bg-app) !important;
+  color: var(--text-primary) !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  caret-color: var(--accent, #60a5fa) !important;
+}
+
+.w-md-editor textarea,
+.w-md-editor .w-md-editor-text-input {
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: auto !important;
+  resize: none !important;
+}
+
+/* CodeMirror specific overrides */
+.w-md-editor .cm-editor {
+  background-color: var(--bg-app) !important;
+  color: var(--text-primary) !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+}
+
+.w-md-editor .cm-editor .cm-content {
+  color: var(--text-primary) !important;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace !important;
+  font-size: 14px !important;
+  line-height: 1.75 !important;
+}
+
+.w-md-editor .cm-editor .cm-line {
+  color: var(--text-primary) !important;
+}
+
+.w-md-editor .cm-editor .cm-gutters {
+  background-color: var(--bg-app) !important;
+  border-right-color: var(--border) !important;
+  color: var(--text-muted) !important;
+}
+
+.w-md-editor .cm-editor .cm-activeLineGutter {
+  background-color: rgba(255,255,255,0.05) !important;
+  color: var(--text-primary) !important;
+}
+
+.w-md-editor .cm-editor .cm-cursor {
+  border-left-color: var(--accent, #60a5fa) !important;
+}
+
+.w-md-editor .cm-editor .cm-selectionBackground,
+.w-md-editor .cm-editor.cm-focused .cm-selectionBackground {
+  background-color: rgba(96,165,255,0.2) !important;
+}
+
+/* Legacy textarea fallback */
+.w-md-editor textarea {
+  background-color: var(--bg-app) !important;
+  color: var(--text-primary) !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace !important;
+  font-size: 14px !important;
+  line-height: 1.75 !important;
+}
+
+/* ── Preview pane ── */
+.w-md-editor-preview {
+  background-color: var(--bg-app) !important;
+  color: var(--text-primary) !important;
+  padding: 20px 28px !important;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 15px !important;
+  line-height: 1.75 !important;
+}
+
+.w-md-editor-preview h1,
+.w-md-editor-preview h2,
+.w-md-editor-preview h3,
+.w-md-editor-preview h4,
+.w-md-editor-preview h5,
+.w-md-editor-preview h6 {
+  color: var(--text-primary) !important;
+}
+
+.w-md-editor-preview p {
+  color: var(--text-primary) !important;
+}
+
+.w-md-editor-preview a {
+  color: var(--accent, #60a5fa) !important;
+}
+
+.w-md-editor-preview strong {
+  color: var(--text-primary) !important;
+}
+
+.w-md-editor-preview em {
+  color: var(--text-secondary) !important;
+}
+
+.w-md-editor-preview code {
+  background-color: rgba(255,255,255,0.08) !important;
+  color: #e2b06a !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  border-radius: 4px !important;
+  padding: 2px 6px !important;
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+.w-md-editor-preview pre {
+  background-color: rgba(0,0,0,0.45) !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 8px !important;
+  padding: 14px 18px !important;
+}
+
+.w-md-editor-preview pre code {
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  color: #e4e4e7 !important;
+}
+
+.w-md-editor-preview blockquote {
+  border-left-color: var(--accent, #60a5fa) !important;
+  background-color: rgba(96,165,250,0.06) !important;
+  color: var(--text-secondary) !important;
+  border-radius: 0 6px 6px 0 !important;
+  padding: 8px 16px !important;
+  margin: 0 0 14px !important;
+}
+
+.w-md-editor-preview table {
+  border-collapse: collapse !important;
+  width: 100% !important;
+}
+
+.w-md-editor-preview th {
+  background-color: rgba(255,255,255,0.04) !important;
+  color: var(--text-secondary) !important;
+  font-weight: 600 !important;
+  padding: 8px 12px !important;
+  text-align: left !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.w-md-editor-preview td {
+  padding: 8px 12px !important;
+  color: var(--text-primary) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.04) !important;
+}
+
+.w-md-editor-preview tr:hover {
+  background-color: rgba(255,255,255,0.02) !important;
+}
+
+.w-md-editor-preview hr {
+  border: none !important;
+  border-top: 1px solid rgba(255,255,255,0.12) !important;
+  margin: 28px 0 !important;
+}
+
+.w-md-editor-preview img {
+  max-width: 100% !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--border) !important;
+}
+
+.w-md-editor-preview ul,
+.w-md-editor-preview ol {
+  padding-left: 20px !important;
+  margin-bottom: 14px !important;
+}
+
+.w-md-editor-preview li {
+  margin-bottom: 4px !important;
+  color: var(--text-primary) !important;
+}
+
+.w-md-editor-preview input[type="checkbox"] {
+  margin-right: 6px !important;
+  accent-color: var(--accent, #60a5fa) !important;
+}
+
+/* ── Focus ── */
+.w-md-editor:focus-within {
+  border-color: var(--border-focus, rgba(56,189,248,0.35)) !important;
+  box-shadow: none !important;
+}
+
+/* ── Hide mode toggle buttons (Edit / Live / Preview) from toolbar ── */
+.w-md-editor-toolbar li > button[aria-label*="Edit code"],
+.w-md-editor-toolbar li > button[aria-label*="Live code"],
+.w-md-editor-toolbar li > button[aria-label*="Preview code"],
+.w-md-editor-toolbar li > button[aria-label*="Toggle fullscreen"] {
+  display: none !important;
+}

@@ -1,12 +1,15 @@
 import { useMemo, useState, useCallback, useEffect, useRef, type JSX } from "react"
 import MarkdownPreview from "../ui/MarkdownPreview"
+import ThemedMDEditor, { type ThemedMDEditorHandle } from "../ui/ThemedMDEditor"
 import { useKanbanStore } from "../../state/kanbanStore"
 import { tagColorClasses } from "../../utils/tagColors"
 import ExplorerTree from "../ui/ExplorerTree"
 import TextInputDialog from "../ui/TextInputDialog"
 import ConfirmDialog from "../ui/ConfirmDialog"
+import Modal from "../ui/Modal"
 import CreateNoteDialog from "../ui/CreateNoteDialog"
 import CategoryEditDialog from "../ui/CategoryEditDialog"
+import DropdownMenu, { type MenuItem } from "../ui/DropdownMenu"
 import BacklinksSection from "../notes/BacklinksSection"
 import type { Task } from "../../models/Task"
 
@@ -17,168 +20,6 @@ import type { Task } from "../../models/Task"
 const AUTOSAVE_DELAY = 1200 // ms
 
 const PREDEFINED_TAGS = ["api", "ui", "backend", "frontend", "bug", "feature", "documentation", "security", "performance"]
-
-// Toolbar button definitions
-const TOOLBAR: Array<{
-  label: string; title: string
-  action: (ta: HTMLTextAreaElement, val: string) => { value: string; cursor: number } | null
-  wrap?: boolean
-}> = [
-  {
-    label: "**B**", title: "Bold",
-    action: (ta, val) => wrapSelection(ta, val, "**", "**", "bold text"),
-  },
-  {
-    label: "*I*", title: "Italic",
-    action: (ta, val) => wrapSelection(ta, val, "*", "*", "italic text"),
-  },
-  {
-    label: "~~S~~", title: "Strikethrough",
-    action: (ta, val) => wrapSelection(ta, val, "~~", "~~", "strikethrough"),
-  },
-  {
-    label: "`c`", title: "Inline code",
-    action: (ta, val) => wrapSelection(ta, val, "`", "`", "code"),
-  },
-  {
-    label: "```", title: "Code block",
-    action: (ta, val) => insertBlock(ta, val, "```\n", "\n```", "code here"),
-  },
-  { label: "—", title: "sep", action: () => null },
-  {
-    label: "H1", title: "Heading 1",
-    action: (ta, val) => insertLinePrefix(ta, val, "# "),
-  },
-  {
-    label: "H2", title: "Heading 2",
-    action: (ta, val) => insertLinePrefix(ta, val, "## "),
-  },
-  {
-    label: "H3", title: "Heading 3",
-    action: (ta, val) => insertLinePrefix(ta, val, "### "),
-  },
-  { label: "—", title: "sep", action: () => null },
-  {
-    label: "—", title: "Horizontal rule",
-    action: (ta, val) => insertAtCursor(ta, val, "\n\n---\n\n"),
-  },
-  {
-    label: "• List", title: "Bullet list",
-    action: (ta, val) => insertLinePrefix(ta, val, "- "),
-  },
-  {
-    label: "1. List", title: "Numbered list",
-    action: (ta, val) => insertLinePrefix(ta, val, "1. "),
-  },
-  {
-    label: "☑ Task", title: "Task list item",
-    action: (ta, val) => insertLinePrefix(ta, val, "- [ ] "),
-  },
-  { label: "—", title: "sep", action: () => null },
-  {
-    label: "> Quote", title: "Blockquote",
-    action: (ta, val) => insertLinePrefix(ta, val, "> "),
-  },
-  {
-    label: "🔗 Link", title: "Insert link",
-    action: (ta, val) => {
-      const sel = val.slice(ta.selectionStart, ta.selectionEnd) || "link text"
-      const ins = `[${sel}](url)`
-      const newVal = val.slice(0, ta.selectionStart) + ins + val.slice(ta.selectionEnd)
-      return { value: newVal, cursor: ta.selectionStart + ins.length }
-    },
-  },
-  {
-    label: "[[Wiki]]", title: "Wiki link to another note",
-    action: (ta, val) => {
-      const sel = val.slice(ta.selectionStart, ta.selectionEnd) || "Note Title"
-      const ins = `[[${sel}]]`
-      const newVal = val.slice(0, ta.selectionStart) + ins + val.slice(ta.selectionEnd)
-      return { value: newVal, cursor: ta.selectionStart + ins.length }
-    },
-  },
-  {
-    label: "📋 Table", title: "Insert table",
-    action: (ta, val) => insertAtCursor(ta, val,
-      "\n| Column 1 | Column 2 | Column 3 |\n|----------|----------|----------|\n| Cell 1   | Cell 2   | Cell 3   |\n"
-    ),
-  },
-]
-
-function wrapSelection(
-  ta: HTMLTextAreaElement, val: string,
-  before: string, after: string, placeholder: string
-): { value: string; cursor: number } {
-  const start = ta.selectionStart
-  const end   = ta.selectionEnd
-  const sel   = val.slice(start, end) || placeholder
-  const newVal = val.slice(0, start) + before + sel + after + val.slice(end)
-  return { value: newVal, cursor: start + before.length + sel.length + after.length }
-}
-
-function insertBlock(
-  ta: HTMLTextAreaElement, val: string,
-  before: string, after: string, placeholder: string
-): { value: string; cursor: number } {
-  const start = ta.selectionStart
-  const sel   = val.slice(start, ta.selectionEnd) || placeholder
-  const newVal = val.slice(0, start) + before + sel + after + val.slice(ta.selectionEnd)
-  return { value: newVal, cursor: start + before.length + sel.length + after.length }
-}
-
-function insertLinePrefix(
-  ta: HTMLTextAreaElement, val: string, prefix: string
-): { value: string; cursor: number } {
-  const start     = ta.selectionStart
-  const lineStart = val.lastIndexOf("\n", start - 1) + 1
-  const newVal    = val.slice(0, lineStart) + prefix + val.slice(lineStart)
-  return { value: newVal, cursor: start + prefix.length }
-}
-
-function insertAtCursor(
-  ta: HTMLTextAreaElement, val: string, text: string
-): { value: string; cursor: number } {
-  const pos    = ta.selectionStart
-  const newVal = val.slice(0, pos) + text + val.slice(pos)
-  return { value: newVal, cursor: pos + text.length }
-}
-
-// Smart Enter: auto-continue lists / task items
-function smartEnter(value: string, selStart: number): { newValue: string; newCursor: number } | null {
-  const lines  = value.slice(0, selStart).split("\n")
-  const line   = lines[lines.length - 1]
-  const cbMatch = line.match(/^(\s*- \[[ x]\] )(.*)$/)
-  const ulMatch = line.match(/^(\s*[-*+] )(.*)$/)
-  const olMatch = line.match(/^(\s*(\d+)\. )(.*)$/)
-  if (cbMatch) {
-    if (!cbMatch[2]) {
-      const before = value.slice(0, selStart - line.length)
-      return { newValue: before + value.slice(selStart), newCursor: before.length }
-    }
-    const prefix   = cbMatch[1].replace(/\[x\]/i, "[ ]")
-    const newValue = value.slice(0, selStart) + "\n" + prefix + value.slice(selStart)
-    return { newValue, newCursor: selStart + 1 + prefix.length }
-  }
-  if (ulMatch) {
-    if (!ulMatch[2]) {
-      const before = value.slice(0, selStart - line.length)
-      return { newValue: before + value.slice(selStart), newCursor: before.length }
-    }
-    const newValue = value.slice(0, selStart) + "\n" + ulMatch[1] + value.slice(selStart)
-    return { newValue, newCursor: selStart + 1 + ulMatch[1].length }
-  }
-  if (olMatch) {
-    if (!olMatch[3]) {
-      const before = value.slice(0, selStart - line.length)
-      return { newValue: before + value.slice(selStart), newCursor: before.length }
-    }
-    const next     = parseInt(olMatch[2]) + 1
-    const prefix   = olMatch[1].replace(/\d+/, String(next))
-    const newValue = value.slice(0, selStart) + "\n" + prefix + value.slice(selStart)
-    return { newValue, newCursor: selStart + 1 + prefix.length }
-  }
-  return null
-}
 
 // Word count helper
 function wordCount(text: string) {
@@ -218,8 +59,16 @@ export default function NotesView() {
   const [deletingCategory,       setDeletingCategory]       = useState<string | null>(null)
   const [sidebarSearch,          setSidebarSearch]          = useState("")
   const [focusMode,              setFocusMode]              = useState(false)
+  const [contextMenu,            setContextMenu]            = useState<{ noteId: string; anchorEl: HTMLButtonElement } | null>(null)
+  const [contextMenuNoteId,      setContextMenuNoteId]      = useState<string | null>(null)
+  const [showCategoryDialog,     setShowCategoryDialog]     = useState(false)
+  const [categoryDialogNoteId,   setCategoryDialogNoteId]   = useState<string | null>(null)
+  const [showPdfOptions,         setShowPdfOptions]         = useState(false)
+  const [pdfShowHeader,          setPdfShowHeader]          = useState(true)
+  const [pdfShowTags,            setPdfShowTags]            = useState(true)
+  const [pdfShowWordCount,       setPdfShowWordCount]       = useState(true)
 
-  const textareaRef    = useRef<HTMLTextAreaElement>(null)
+  const editorRef      = useRef<ThemedMDEditorHandle>(null)
   const autosaveTimer  = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Derived data ───────────────────────────────────────────────────────────
@@ -337,13 +186,14 @@ export default function NotesView() {
         .replace(/`/g, '\\`')
         .replace(/\$/g, '\\$')
 
-      const tagsHtml = noteTags.length > 0
+      const tagsHtml = pdfShowTags && noteTags.length > 0
         ? noteTags.map(t => `<span class="tag">#${t}</span>`).join('') : ''
 
+      const wordCount = noteContent.trim().split(/\s+/).filter(Boolean).length
       const metaParts = [
         selectedNote.data?.category ? `<span>📁 ${selectedNote.data.category}</span>` : '',
         `<span>🗓 ${new Date(selectedNote.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>`,
-        `<span>📝 ${noteContent.trim().split(/\s+/).filter(Boolean).length} words</span>`,
+        pdfShowWordCount ? `<span>📝 ${wordCount} words</span>` : '',
       ].filter(Boolean).join(' &nbsp;·&nbsp; ')
 
       const htmlContent = `<!DOCTYPE html>
@@ -374,8 +224,8 @@ export default function NotesView() {
     strong { font-weight: 700; color: #0f172a; } em { font-style: italic; color: #374151; }
     del { text-decoration: line-through; color: #9ca3af; }
     code { font-family: 'JetBrains Mono', monospace; font-size: 0.875em; background: #f1f5f9; color: #be185d; padding: 2px 6px; border-radius: 4px; border: 1px solid #e2e8f0; }
-    pre { background: #0f172a; border-radius: 8px; padding: 16px 18px; overflow-x: auto; margin: 1.2em 0; }
-    pre code { background: none; border: none; padding: 0; color: #e2e8f0; font-size: 13px; line-height: 1.6; }
+    pre { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 18px; overflow-x: auto; margin: 1.2em 0; }
+    pre code { background: none; border: none; padding: 0; color: #334155; font-size: 13px; line-height: 1.6; }
     blockquote { border-left: 3px solid #6366f1; background: #f8f9ff; margin: 1em 0; padding: 10px 16px; border-radius: 0 6px 6px 0; color: #475569; }
     blockquote p { margin: 0; }
     ul, ol { padding-left: 22px; margin: 0.6em 0 1em; } li { margin-bottom: 4px; color: #1e293b; }
@@ -399,15 +249,14 @@ export default function NotesView() {
   </style>
 </head>
 <body>
-  <div class="doc-header">
+  ${pdfShowHeader ? `<div class="doc-header">
     <div class="doc-title">${selectedNote.title}</div>
     <div class="doc-meta">${metaParts}</div>
     ${tagsHtml ? `<div class="tags">${tagsHtml}</div>` : ''}
-  </div>
+  </div>` : ''}
   <div id="content"></div>
   <div class="print-bar">
     <span class="print-bar-label">Use your browser's print dialog → "Save as PDF" to export.</span>
-    <button class="btn btn-dismiss" onclick="window.parent.document.getElementById('__pdf_frame__')?.remove();window.parent.document.getElementById('__pdf_close_btn__')?.remove()">✕ Close</button>
     <button class="btn btn-print" onclick="window.print()">🖨&nbsp; Print / Save as PDF</button>
   </div>
   <script>
@@ -458,7 +307,7 @@ export default function NotesView() {
     } catch (err) {
       console.error('Export failed:', err)
     }
-  }, [selectedNote, noteContent, noteTags])
+  }, [selectedNote, noteContent, noteTags, pdfShowHeader, pdfShowTags, pdfShowWordCount])
 
   const handleWikiLinkClick = useCallback((title: string) => {
     const found = noteTasks.find(t => t.title.toLowerCase() === title.toLowerCase())
@@ -476,21 +325,93 @@ export default function NotesView() {
   }
 
   const confirmDeleteNote = async () => {
-    if (!selectedNoteId) return
-    await useKanbanStore.getState().deleteTask(selectedNoteId)
-    setSelectedNoteId(undefined); setNoteContent("")
+    const noteId = contextMenuNoteId || selectedNoteId
+    if (!noteId) return
+    await useKanbanStore.getState().deleteTask(noteId)
+    if (noteId === selectedNoteId) { setSelectedNoteId(undefined); setNoteContent("") }
     setShowDeleteDialog(false)
+    setContextMenuNoteId(null)
   }
 
   const confirmEditTitle = async (newTitle: string) => {
-    if (!selectedNoteId || !newTitle.trim()) return
-    await useKanbanStore.getState().updateTask(selectedNoteId, { title: newTitle.trim() })
+    const noteId = contextMenuNoteId || selectedNoteId
+    if (!noteId || !newTitle.trim()) return
+    await useKanbanStore.getState().updateTask(noteId, { title: newTitle.trim() })
     setShowEditTitleDialog(false)
+    setContextMenuNoteId(null)
+  }
+
+  const confirmEditCategory = async (newCategory: string) => {
+    if (!categoryDialogNoteId || !newCategory.trim()) return
+    const note = noteTasks.find(t => t.id === categoryDialogNoteId)
+    if (!note) return
+    await useKanbanStore.getState().updateTask(categoryDialogNoteId, {
+      data: { ...note.data, category: newCategory.trim() === "Uncategorized" ? undefined : newCategory.trim() },
+    })
+    setShowCategoryDialog(false)
+    setCategoryDialogNoteId(null)
   }
 
   const handleCreateNote = (cat: string) => { setPendingCategory(cat); setShowCreateDialog(true) }
 
-  const handleConfirmCreate = async (title: string, category: string) => {
+  // ── Context menu for notes list ──────────────────────────────────────────
+  const contextMenuItems: MenuItem[] = contextMenu ? (() => {
+    const task = noteTasks.find(t => t.id === contextMenu.noteId)
+    if (!task) return []
+    const isFav = !!(task.data?.favourite as boolean)
+    return [
+      {
+        label: isFav ? "Unfavourite" : "Favourite",
+        icon: <span style={{ fontSize: 12 }}>{isFav ? "☆" : "★"}</span>,
+        onClick: async () => {
+          await useKanbanStore.getState().updateTask(task.id, {
+            data: { ...task.data, favourite: !isFav },
+          })
+        },
+      },
+      { separator: true },
+      {
+        label: "Edit category",
+        icon: (
+          <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+          </svg>
+        ),
+        onClick: () => {
+          setCategoryDialogNoteId(task.id)
+          setShowCategoryDialog(true)
+        },
+      },
+      {
+        label: "Rename",
+        icon: (
+          <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+        ),
+        onClick: () => {
+          setContextMenuNoteId(task.id)
+          setShowEditTitleDialog(true)
+        },
+      },
+      { separator: true },
+      {
+        label: "Delete",
+        icon: (
+          <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        ),
+        danger: true,
+        onClick: () => {
+          setContextMenuNoteId(task.id)
+          setShowDeleteDialog(true)
+        },
+      },
+    ]
+  })() : []
+
+  const handleConfirmCreate = async (title: string, category: string, content?: string) => {
     if (!title.trim() || !activeBoard) return
     // Each category maps to a column of the same name — find or create it
     const colName = category.trim() || "Notes"
@@ -502,7 +423,9 @@ export default function NotesView() {
     const colId = col?.id ?? columns.find(c => c.boardId === activeBoard.id)?.id
     if (!colId) return
     await useKanbanStore.getState().createTask(colId, title.trim(), {
-      type: "note", data: { category: colName },
+      type: "note",
+      description: content || undefined,
+      data: { category: colName },
     })
     setShowCreateDialog(false)
     const newNote = useKanbanStore.getState().tasks.find(t => t.title === title.trim() && t.type === "note")
@@ -543,51 +466,18 @@ export default function NotesView() {
   }
 
   // ── Textarea key handling ──────────────────────────────────────────────────
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const ta  = e.currentTarget
-    const val = noteContent
-
-    if (e.key === "Tab") {
-      e.preventDefault()
-      const res = insertAtCursor(ta, val, "  ")
-      setNoteContent(res.value)
-      requestAnimationFrame(() => ta.setSelectionRange(res.cursor, res.cursor))
-      setIsDirty(true)
-      return
-    }
-
-    if (e.key === "Enter" && !e.shiftKey) {
-      const result = smartEnter(val, ta.selectionStart)
-      if (result) {
-        e.preventDefault()
-        setNoteContent(result.newValue)
-        requestAnimationFrame(() => ta.setSelectionRange(result.newCursor, result.newCursor))
-        setIsDirty(true)
-        return
-      }
-    }
-  }
+  // Note: MDEditor handles its own keyboard shortcuts
 
   // ── Image paste / drag-and-drop ────────────────────────────────────────────
   // ── Toolbar action ─────────────────────────────────────────────────────────
-  const applyToolbar = (toolbarItem: typeof TOOLBAR[0]) => {
-    const ta = textareaRef.current
-    if (!ta) return
-    const result = toolbarItem.action(ta, noteContent)
-    if (!result) return
-    setNoteContent(result.value)
-    setIsDirty(true)
-    requestAnimationFrame(() => {
-      ta.focus()
-      ta.setSelectionRange(result.cursor, result.cursor)
-    })
-  }
+  // Note: MDEditor provides its own toolbar
 
   // ── Render note item for sidebar ───────────────────────────────────────────
   const renderNoteItem = (task: Task) => {
     const isSelected = selectedNoteId === task.id
     return (
       <div
+        className="group relative"
         style={{
           padding: "7px 10px",
           borderRadius: 7,
@@ -598,6 +488,17 @@ export default function NotesView() {
         }}
         onMouseEnter={e => { if (!isSelected) e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.04)" }}
         onMouseLeave={e => { if (!isSelected) e.currentTarget.style.backgroundColor = "transparent" }}
+        onContextMenu={e => {
+          e.preventDefault()
+          e.stopPropagation()
+          // Find the triple-dot button within this item and use it as anchor
+          const btn = e.currentTarget.querySelector('button:last-of-type') as HTMLButtonElement | null
+          if (btn) {
+            setContextMenu({ noteId: task.id, anchorEl: btn })
+          } else {
+            setContextMenu({ noteId: task.id, anchorEl: e.currentTarget as unknown as HTMLButtonElement })
+          }
+        }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
           {!!(task.data?.favourite as boolean) && (
@@ -607,9 +508,37 @@ export default function NotesView() {
             fontSize: 13, fontWeight: isSelected ? 600 : 500,
             color: isSelected ? "var(--text-primary)" : "var(--text-secondary)",
             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            flex: 1, minWidth: 0,
           }}>
             {task.title || "Untitled Note"}
           </div>
+          {/* Triple-dot menu button — visible on hover */}
+          <button
+            className="opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={e => {
+              e.stopPropagation()
+              setContextMenu({ noteId: task.id, anchorEl: e.currentTarget })
+            }}
+            onContextMenu={e => {
+              e.preventDefault()
+              e.stopPropagation()
+              setContextMenu({ noteId: task.id, anchorEl: e.currentTarget })
+            }}
+            style={{
+              flexShrink: 0, width: 20, height: 20, borderRadius: 4,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              backgroundColor: "transparent", border: "none", cursor: "pointer",
+              color: "var(--text-muted)", padding: 0,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "var(--text-primary)" }}
+            onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = "var(--text-muted)" }}
+          >
+            <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+              <circle cx="2" cy="8" r="1.5" />
+              <circle cx="8" cy="8" r="1.5" />
+              <circle cx="14" cy="8" r="1.5" />
+            </svg>
+          </button>
         </div>
         {task.description && (
           <div style={{
@@ -644,11 +573,11 @@ export default function NotesView() {
 
   return (
     <>
-      <div style={{
-        display: "flex", height: "100%", overflow: "hidden",
-        fontFamily: "'DM Sans', sans-serif",
-        backgroundColor: "var(--bg-app)",
-      }}>
+    <div style={{
+      display: "flex", flex: 1, minHeight: 0, overflow: "hidden",
+      fontFamily: "'DM Sans', sans-serif",
+      backgroundColor: "var(--bg-app)",
+    }}>
 
         {/* ── Sidebar ──────────────────────────────────────────────────────── */}
         {!focusMode && (
@@ -656,6 +585,7 @@ export default function NotesView() {
             width: sidebarCollapsed ? 48 : 260,
             flexShrink: 0,
             display: "flex", flexDirection: "column",
+            height: "100%",
             borderRight: "1px solid var(--border)",
             backgroundColor: "var(--bg-column-solid, rgba(255,255,255,0.01))",
             transition: "width 0.2s ease",
@@ -720,7 +650,7 @@ export default function NotesView() {
 
             {/* Collapsed icon strip — one avatar per note */}
             {sidebarCollapsed && noteTasks.length > 0 && (
-              <div style={{ flex: 1, overflowY: "auto", padding: "6px 4px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "6px 4px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                 {noteTasks.map(task => {
                   const isSelected = selectedNoteId === task.id
                   const letters = task.title.trim().slice(0, 2).toUpperCase() || "?"
@@ -772,7 +702,7 @@ export default function NotesView() {
 
             {/* Notes tree */}
             {!sidebarCollapsed && (
-              <div style={{ flex: 1, overflowY: "auto", padding: "0 6px 12px" }}>
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "0 6px 12px" }}>
                 {noteTasks.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "32px 16px", color: "var(--text-muted)" }}>
                     <p style={{ fontSize: 13, marginBottom: 12 }}>No notes yet</p>
@@ -961,7 +891,7 @@ export default function NotesView() {
                     </div>
 
                     {/* Export PDF */}
-                    <HeaderBtn title="Export as PDF" onClick={handleExportPdf}>
+                    <HeaderBtn title="Export as PDF" onClick={() => setShowPdfOptions(true)}>
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 14 14">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M7 1.5v6m0 0L4.5 5m2.5 2.5L9.5 5" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M1.5 9.5v1A2 2 0 003.5 12.5h7a2 2 0 002-2v-1" />
@@ -1077,25 +1007,14 @@ export default function NotesView() {
                   />
                 </div>
 
-                {/* Markdown toolbar */}
+                {/* Word count */}
                 {viewMode !== "preview" && (
                   <div style={{
-                    display: "flex", gap: 2, flexWrap: "wrap",
+                    display: "flex", justifyContent: "flex-end",
                     borderTop: "1px solid var(--border)",
                     paddingTop: 6, paddingBottom: 6,
                   }}>
-                    {TOOLBAR.map((item, i) => {
-                      if (item.title === "sep") {
-                        return <div key={i} style={{ width: 1, height: 18, backgroundColor: "var(--border)", margin: "0 2px", alignSelf: "center" }} />
-                      }
-                      return (
-                        <ToolbarBtn key={i} title={item.title} onMouseDown={e => { e.preventDefault(); applyToolbar(item) }}>
-                          {item.label}
-                        </ToolbarBtn>
-                      )
-                    })}
-                    <div style={{ flex: 1 }} />
-                    <span style={{ fontSize: 10, color: "var(--text-muted)", alignSelf: "center", paddingRight: 4, whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: 10, color: "var(--text-muted)", paddingRight: 4, whiteSpace: "nowrap" }}>
                       {wordCountInfo.words}w · {wordCountInfo.chars}c · {wordCountInfo.lines}L
                     </span>
                   </div>
@@ -1116,47 +1035,26 @@ export default function NotesView() {
                       // Doc-width: scrollable wrapper with centered max-width column
                       <div style={{ flex: 1, overflowY: "auto", minHeight: 0, position: "relative" }}>
                         <div style={{ maxWidth: 760, margin: "0 auto", minHeight: "100%", display: "flex", flexDirection: "column" }}>
-                          <textarea
-                            ref={textareaRef}
+                          <ThemedMDEditor
+                            ref={editorRef}
                             value={noteContent}
-                            onChange={e => handleContentChange(e.target.value)}
-                            onKeyDown={handleKeyDown}
+                            onChange={handleContentChange}
                             placeholder="Start writing…"
-                            spellCheck
-                            style={{
-                              flex: 1, width: "100%",
-                              resize: "none", border: "none", outline: "none",
-                              backgroundColor: "transparent",
-                              color: "var(--text-primary)", fontSize: 15, lineHeight: 1.8,
-                              padding: "28px 8px",
-                              fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-                              caretColor: "var(--accent, #60a5fa)",
-                              minHeight: "100%",
-                            }}
+                            height="100%"
+                            minHeight={400}
+                            preview="edit"
                           />
                         </div>
                       </div>
                     ) : (
-                      <textarea
-                        ref={textareaRef}
+                      <ThemedMDEditor
+                        ref={editorRef}
                         value={noteContent}
-                        onChange={e => handleContentChange(e.target.value)}
-                        onKeyDown={handleKeyDown}
+                        onChange={handleContentChange}
                         placeholder="Start writing… Lists auto-continue on Enter · Tab for indent · ⌘S to save"
-                        spellCheck
-                        style={{
-                          flex: 1,
-                          width: "100%",
-                          height: "100%",
-                          resize: "none", border: "none", outline: "none",
-                          backgroundColor: "var(--bg-app)",
-                          color: "var(--text-primary)", fontSize: 14, lineHeight: 1.75,
-                          padding: "20px 24px",
-                          fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-                          caretColor: "var(--accent, #60a5fa)",
-                          overflowY: "auto",
-                          boxSizing: "border-box",
-                        }}
+                        height="100%"
+                        minHeight={400}
+                        preview="edit"
                       />
                     )}
                   </div>
@@ -1167,7 +1065,7 @@ export default function NotesView() {
                   <div style={{
                     flex: 1, overflowY: "auto", minWidth: 0,
                     padding: docWidthMode ? "0 24px" : "20px 32px",
-                    backgroundColor: viewMode === "split" ? "rgba(0,0,0,0.15)" : "var(--bg-app)",
+                    backgroundColor: "var(--bg-app)",
                   }}>
                     <div style={docWidthMode ? { maxWidth: 760, margin: "0 auto", padding: "28px 0" } : {}}>
                     {noteContent.trim() ? (
@@ -1229,9 +1127,10 @@ export default function NotesView() {
             </div>
           )}
         </div>
+
       </div>
 
-      {/* ── Dialogs ───────────────────────────────────────────────────────── */}
+      {/* ── Dialogs ───────────────────────────────────────────────────── */}
       <CreateNoteDialog
         isOpen={showCreateDialog}
         onClose={() => setShowCreateDialog(false)}
@@ -1242,7 +1141,7 @@ export default function NotesView() {
       />
       <ConfirmDialog
         isOpen={showDeleteDialog}
-        onClose={() => setShowDeleteDialog(false)}
+        onClose={() => { setShowDeleteDialog(false); setContextMenuNoteId(null) }}
         onConfirm={confirmDeleteNote}
         title="Delete Note"
         message="Are you sure you want to delete this note? This action cannot be undone."
@@ -1250,13 +1149,13 @@ export default function NotesView() {
       />
       <TextInputDialog
         isOpen={showEditTitleDialog}
-        onClose={() => setShowEditTitleDialog(false)}
+        onClose={() => { setShowEditTitleDialog(false); setContextMenuNoteId(null) }}
         onConfirm={confirmEditTitle}
         title="Rename Note"
         label="Note Title"
         placeholder="Enter note title…"
         required
-        defaultValue={selectedNote?.title || ""}
+        defaultValue={(contextMenuNoteId ? noteTasks.find(t => t.id === contextMenuNoteId)?.title : selectedNote?.title) || ""}
       />
       <CategoryEditDialog
         isOpen={!!editingCategory}
@@ -1273,6 +1172,75 @@ export default function NotesView() {
         message={`Delete "${deletingCategory}" and all its notes? This cannot be undone.`}
         confirmText="Delete" cancelText="Cancel" variant="danger"
       />
+      <TextInputDialog
+        isOpen={showCategoryDialog}
+        onClose={() => { setShowCategoryDialog(false); setCategoryDialogNoteId(null) }}
+        onConfirm={confirmEditCategory}
+        title="Edit Category"
+        label="Category"
+        placeholder="Enter category name…"
+        required
+        defaultValue={(() => {
+          const note = categoryDialogNoteId ? noteTasks.find(t => t.id === categoryDialogNoteId) : null
+          return (note?.data?.category as string) || "Uncategorized"
+        })()}
+      />
+
+      {/* ── Export PDF options ─────────────────────────────────────────────── */}
+      <Modal isOpen={showPdfOptions} onClose={() => setShowPdfOptions(false)} title="Export as PDF">
+        <div className="space-y-4 mb-6">
+          <label className="flex items-center justify-between cursor-pointer">
+            <span style={{ color: "var(--text-primary)", fontSize: 14, fontWeight: 500 }}>Header</span>
+            <input
+              type="checkbox"
+              checked={pdfShowHeader}
+              onChange={(e) => setPdfShowHeader(e.target.checked)}
+              style={{ width: 18, height: 18, accentColor: "var(--accent, #60a5fa)" }}
+            />
+          </label>
+          <label className="flex items-center justify-between cursor-pointer">
+            <span style={{ color: "var(--text-primary)", fontSize: 14, fontWeight: 500 }}>Tags</span>
+            <input
+              type="checkbox"
+              checked={pdfShowTags}
+              onChange={(e) => setPdfShowTags(e.target.checked)}
+              style={{ width: 18, height: 18, accentColor: "var(--accent, #60a5fa)" }}
+            />
+          </label>
+          <label className="flex items-center justify-between cursor-pointer">
+            <span style={{ color: "var(--text-primary)", fontSize: 14, fontWeight: 500 }}>Word count</span>
+            <input
+              type="checkbox"
+              checked={pdfShowWordCount}
+              onChange={(e) => setPdfShowWordCount(e.target.checked)}
+              style={{ width: 18, height: 18, accentColor: "var(--accent, #60a5fa)" }}
+            />
+          </label>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            The header includes the note title, category and creation date. Footer bar (print / save) always stays.
+          </p>
+        </div>
+        <button
+          onClick={() => { setShowPdfOptions(false); handleExportPdf() }}
+          className="w-full px-4 py-3 rounded-lg font-semibold transition-all"
+          style={{ backgroundColor: "var(--accent)", color: "#fff", transform: "scale(1)" }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--accent-muted)" }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--accent)"; e.currentTarget.style.transform = "scale(1)" }}
+          onMouseDown={(e) => { e.currentTarget.style.transform = "scale(0.98)" }}
+          onMouseUp={(e) => { e.currentTarget.style.transform = "scale(1)" }}
+        >
+          Export PDF
+        </button>
+      </Modal>
+
+      {/* ── Context menu for notes list ──────────────────────────────────── */}
+      {contextMenu && (
+        <DropdownMenu
+          items={contextMenuItems}
+          onClose={() => { setContextMenu(null); setContextMenuNoteId(null) }}
+          anchorRef={{ current: contextMenu.anchorEl } as React.RefObject<HTMLElement>}
+        />
+      )}
     </>
   )
 }
@@ -1412,32 +1380,5 @@ function FavouritesSection({ notes, selectedNoteId, onSelect, renderNoteItem }: 
         </div>
       )}
     </div>
-  )
-}
-
-function ToolbarBtn({ title, onMouseDown, children }: {
-  title: string; onMouseDown: (e: React.MouseEvent) => void; children: React.ReactNode
-}) {
-  const [hov, setHov] = useState(false)
-  return (
-    <button
-      title={title}
-      onMouseDown={onMouseDown}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        padding: "2px 7px", borderRadius: 5, border: "1px solid",
-        cursor: "pointer",
-        transition: "background-color 0.1s, color 0.1s, border-color 0.1s",
-        backgroundColor: hov ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)",
-        borderColor: hov ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.07)",
-        color: hov ? "var(--text-primary)" : "var(--text-muted)",
-        fontSize: 11,
-        fontFamily: "'JetBrains Mono', monospace",
-        whiteSpace: "nowrap",
-      }}
-    >
-      {children}
-    </button>
   )
 }

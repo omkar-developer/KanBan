@@ -35,7 +35,6 @@ export default function TaskModal({ task, isOpen, onClose, onSave, onDelete, isC
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)" }}
-      onClick={handleClose}
     >
       <div
         className="w-full max-w-lg rounded-2xl border border-white/[0.09] shadow-2xl flex flex-col max-h-[90vh]"

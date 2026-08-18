@@ -28,7 +28,7 @@ export default function MainLayout({ children, boardName, boardId, onBoardChange
         {boardName && <TopBar boardName={boardName} boardId={boardId} onSettingsClick={onSettingsClick} />}
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto" style={{ backgroundColor: 'var(--bg-app)' }}>
+        <main className="flex-1 overflow-auto" style={{ backgroundColor: 'var(--bg-app)', display: 'flex', flexDirection: 'column' }}>
           {children}
         </main>
       </div>

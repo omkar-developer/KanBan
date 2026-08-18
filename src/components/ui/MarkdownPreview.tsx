@@ -37,6 +37,7 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
 import remarkFootnotes from "remark-footnotes"
+import remarkBreaks from "remark-breaks"
 import rehypeKatex from "rehype-katex"
 import rehypeSlug from "rehype-slug"
 import rehypeRaw from "rehype-raw"
@@ -371,7 +372,7 @@ function processContent(text: string): string {
 // Static plugin arrays — outside component so references never change
 // ─────────────────────────────────────────────────────────────────────────────
 
-const REMARK_PLUGINS = [remarkGfm, remarkMath, [remarkFootnotes, { inlineNotes: true }]] as never
+const REMARK_PLUGINS = [remarkGfm, remarkMath, remarkBreaks, [remarkFootnotes, { inlineNotes: true }]] as never
 const REHYPE_PLUGINS = [rehypeRaw, rehypeKatex, rehypeSlug] as never
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -474,9 +475,14 @@ export default function MarkdownPreview({ content, onWikiLinkClick }: MarkdownPr
             </blockquote>
           ),
 
-          code: ({inline,children,className}:{inline?:boolean;children?:React.ReactNode;className?:string})=>{
-            if (inline) return <>{children}</>
-            const lang=(className||"").replace("language-","").toLowerCase()
+          code: ({children,className}:{children?:React.ReactNode;className?:string})=>{
+            const isBlock = typeof className === "string" && className.includes("language-")
+            if (!isBlock) return (
+              <code style={{backgroundColor:inlineCodeBg,border:`1px solid ${inlineCodeBorder}`,color:inlineCodeColor,borderRadius:4,padding:"1px 5px",fontFamily:"'JetBrains Mono','Fira Code','Cascadia Code',monospace",fontSize:"0.88em",whiteSpace:"pre-wrap",wordBreak:"break-word"}}>
+                {children}
+              </code>
+            )
+            const lang=className.replace("language-","").toLowerCase()
             const code=String(children).replace(/\n$/,"")
             if(lang==="mermaid") return <MermaidDiagram code={code} dark={dark}/>
             if(lang==="latex"||lang==="math") return <LatexBlock code={code}/>

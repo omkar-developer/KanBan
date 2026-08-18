@@ -102,7 +102,7 @@ export default function BoardView({ boardId }: Props) {
     }
     // "notes" mode (or any other) → notes editor
     return (
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden" style={{ display: "flex", flexDirection: "column" }}>
         <NotesView />
       </div>
     )

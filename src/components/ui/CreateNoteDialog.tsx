@@ -4,7 +4,7 @@ import Modal from './Modal'
 interface CreateNoteDialogProps {
   isOpen: boolean
   onClose: () => void
-  onConfirm: (title: string, category: string) => Promise<void>
+  onConfirm: (title: string, category: string, content?: string) => Promise<void>
   title?: string
   defaultCategory?: string
   existingCategories?: string[]

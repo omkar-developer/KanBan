@@ -642,7 +642,6 @@ export default function SettingsPanel({ isOpen, onClose }: Props) {
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ backgroundColor: "rgba(0, 0, 0, 0.72)", backdropFilter: "blur(4px)" }}
-      onClick={onClose}
     >
       <div
         className="w-full max-w-md rounded-2xl border shadow-2xl flex flex-col max-h-[90vh]"

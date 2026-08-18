@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef } from 'react'
 
 interface ModalProps {
   isOpen: boolean
@@ -32,23 +32,12 @@ export default function Modal({ isOpen, onClose, children, title }: ModalProps) 
     return () => document.removeEventListener('keydown', handleEsc)
   }, [isOpen, onClose])
 
-  // Handle backdrop click
-  const handleBackdropClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (e.target === e.currentTarget) {
-        onClose()
-      }
-    },
-    [onClose]
-  )
-
   if (!isOpen) return null
 
   return (
     <div
       className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-sm"
       style={{ backgroundColor: "rgba(0, 0, 0, 0.6)" }}
-      onClick={handleBackdropClick}
     >
       <div
         ref={modalRef}

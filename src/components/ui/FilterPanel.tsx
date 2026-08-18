@@ -32,7 +32,6 @@ export default function FilterPanel({
       <div
         className="absolute inset-0"
         style={{ backgroundColor: "rgba(0, 0, 0, 0.5)" }}
-        onClick={onClose}
       />
 
       {/* Panel */}

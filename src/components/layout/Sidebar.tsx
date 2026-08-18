@@ -4,11 +4,13 @@ import type { Board } from "../../models/Board"
 import ExplorerTree from "../ui/ExplorerTree"
 import EditBoardDialog from "../ui/EditBoardDialog"
 import ConfirmDialog from "../ui/ConfirmDialog"
+import TextInputDialog from "../ui/TextInputDialog"
 import {
   Circle, Square, Bookmark, Star, Zap, Flame, Lightbulb, Rocket,
   Bug, Wrench, ClipboardList, LayoutList, Inbox, Pencil, FileText,
   Code2, GitBranch, Database, Server, Cloud, Link, Clock, Calendar,
-  CheckCircle, BookOpen, Target, Pin, Sparkles, Coffee, Layers, Hammer
+  CheckCircle, BookOpen, Target, Pin, Sparkles, Coffee, Layers, Hammer,
+  Tag
 } from "lucide-react"
 
 interface SidebarProps {
@@ -81,6 +83,8 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
   const [editingBoard, setEditingBoard] = useState<Board | null>(null)
   const [deletingBoardId, setDeletingBoardId] = useState<string | null>(null)
   const [menuOpenBoardId, setMenuOpenBoardId] = useState<string | null>(null)
+  const [renamingCategory, setRenamingCategory] = useState<string | null>(null)
+  const [editingCategoryBoardId, setEditingCategoryBoardId] = useState<string | null>(null)
 
   // Persist collapsed state to localStorage
   useEffect(() => {
@@ -116,6 +120,78 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
     setModalColor("#3b82f6")
   }
 
+  const renderCategoryHeader = (
+    groupLabel: string,
+    groupItems: Board[],
+    onCreate: ((groupKey: string) => void) | undefined,
+    isExpanded: boolean,
+    onToggle: () => void,
+  ) => (
+    <div className="group" style={{ display: "flex", alignItems: "center", gap: 2, padding: "4px 6px 2px" }}>
+      <button
+        onClick={onToggle}
+        title={isExpanded ? "Collapse" : "Expand"}
+        style={{
+          padding: 2, borderRadius: 4, border: "none", cursor: "pointer",
+          backgroundColor: "transparent", color: "var(--text-muted)",
+          display: "flex", alignItems: "center", flexShrink: 0,
+          transition: "color 0.1s",
+        }}
+        onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)" }}
+        onMouseLeave={e => { e.currentTarget.style.color = "var(--text-muted)" }}
+      >
+        <svg style={{ transition: "transform 0.15s", transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)" }}
+          width={10} height={10} fill="none" stroke="currentColor" viewBox="0 0 10 10">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 2l4 3-4 3" />
+        </svg>
+      </button>
+      <span
+        onClick={onToggle}
+        style={{
+          fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+          letterSpacing: "0.08em", color: "var(--text-muted)", flex: 1,
+          cursor: "pointer", userSelect: "none",
+        }}
+      >
+        {groupLabel} <span style={{ fontWeight: 500, opacity: 0.7 }}>({groupItems.length})</span>
+      </span>
+      <button
+        onClick={() => setRenamingCategory(groupLabel)}
+        title="Rename category"
+        className="opacity-0 group-hover:opacity-100"
+        style={{
+          padding: 3, borderRadius: 4, border: "none", cursor: "pointer",
+          backgroundColor: "transparent", color: "var(--text-muted)",
+          transition: "background-color 0.1s, color 0.1s",
+        }}
+        onMouseEnter={e => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "var(--text-primary)" }}
+        onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = "var(--text-muted)" }}
+      >
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 12 12">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 1.5l2.5 2.5L3 11.5H0.5V9L8 1.5z" />
+        </svg>
+      </button>
+      {onCreate && (
+        <button
+          onClick={() => onCreate(groupLabel)}
+          title={`Add to ${groupLabel}`}
+          className="opacity-0 group-hover:opacity-100"
+          style={{
+            padding: 3, borderRadius: 4, border: "none", cursor: "pointer",
+            backgroundColor: "transparent", color: "var(--text-muted)",
+            transition: "background-color 0.1s, color 0.1s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = "rgba(96,165,250,0.12)"; e.currentTarget.style.color = "var(--accent, #60a5fa)" }}
+          onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = "var(--text-muted)" }}
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 12 12">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 2v8M2 6h8" />
+          </svg>
+        </button>
+      )}
+    </div>
+  )
+
   const handleSelectBoard = (boardId: string) => {
     const board = boards.find(b => b.id === boardId)
     onSelectBoard?.(boardId, (board?.type as "kanban" | "notes") || "kanban")
@@ -139,6 +215,41 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
       setEditingBoard(null)
     } catch (error) {
       console.error('[Sidebar] Error updating board:', error)
+    }
+  }
+
+  const handleEditCategory = async (newCategory: string) => {
+    if (!renamingCategory || !newCategory.trim()) return
+    try {
+      const newName = newCategory.trim()
+      // Update every board in the category
+      const targets = boards.filter(b => (b.category || "Uncategorized") === renamingCategory)
+      for (const board of targets) {
+        const updated = {
+          ...board,
+          category: newName === "Uncategorized" ? undefined : newName,
+        }
+        await useKanbanStore.getState().updateBoard(updated)
+      }
+      setRenamingCategory(null)
+    } catch (error) {
+      console.error('[Sidebar] Error renaming category:', error)
+    }
+  }
+
+  const handleEditBoardCategory = async (newCategory: string) => {
+    if (!editingCategoryBoardId || !newCategory.trim()) return
+    const board = boards.find(b => b.id === editingCategoryBoardId)
+    if (!board) return
+    try {
+      const updated = {
+        ...board,
+        category: newCategory.trim() === "Uncategorized" ? undefined : newCategory.trim(),
+      }
+      await useKanbanStore.getState().updateBoard(updated)
+      setEditingCategoryBoardId(null)
+    } catch (error) {
+      console.error('[Sidebar] Error updating board category:', error)
     }
   }
 
@@ -327,6 +438,28 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
               </button>
               <button
                 onClick={() => {
+                  setEditingCategoryBoardId(board.id)
+                  setMenuOpenBoardId(null)
+                }}
+                className="w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2"
+                style={{
+                  color: 'var(--text-secondary)',
+                  backgroundColor: 'transparent',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--bg-input)'
+                  e.currentTarget.style.color = 'var(--text-primary)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                  e.currentTarget.style.color = 'var(--text-secondary)'
+                }}
+              >
+                <Tag className="w-4 h-4" />
+                Edit category
+              </button>
+              <button
+                onClick={() => {
                   setDeletingBoardId(board.id)
                   setMenuOpenBoardId(null)
                 }}
@@ -361,7 +494,8 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
         style={{
           backgroundColor: 'var(--bg-app)',
           borderRightColor: 'var(--border)',
-          width: isCollapsed ? '64px' : '256px'
+          width: isCollapsed ? '64px' : '256px',
+          overflow: 'hidden',
         }}
       >
         {/* Header */}
@@ -466,7 +600,7 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
         )}
 
         {/* Board List */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4">
           {isCollapsed ? (
             // Collapsed state - show only favorites as icons
             <div className="space-y-2">
@@ -520,6 +654,7 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
                     items={kanbanBoards.map(board => ({ ...board, category: board.category || "Uncategorized" }))}
                     groupKey="category"
                     onCreate={handleAddToCategory}
+                    renderGroupHeader={renderCategoryHeader}
                     renderItem={(board) => renderBoardItem(board, 'kanban-')}
                   />
                 </div>
@@ -533,6 +668,7 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
                     items={notesBoards.map(board => ({ ...board, category: board.category || "Uncategorized" }))}
                     groupKey="category"
                     onCreate={(category) => handleAddToCategory(category, "notes")}
+                    renderGroupHeader={renderCategoryHeader}
                     renderItem={(board) => renderBoardItem(board, 'notes-')}
                   />
                 </div>
@@ -555,7 +691,6 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
       {showCreateModal && (
         <div className="fixed inset-0 flex items-center justify-center z-[100] backdrop-blur-sm"
           style={{ backgroundColor: "rgba(0, 0, 0, 0.6)" }}
-          onClick={() => setShowCreateModal(false)}
         >
           <div
             className="rounded-xl p-6 w-[420px] shadow-2xl max-h-[90vh] overflow-y-auto"
@@ -814,6 +949,37 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
           onClose={() => setEditingBoard(null)}
           onConfirm={handleEditBoard}
           board={editingBoard}
+        />
+      )}
+
+      {/* Rename Category Dialog */}
+      {renamingCategory && (
+        <TextInputDialog
+          isOpen={!!renamingCategory}
+          onClose={() => setRenamingCategory(null)}
+          onConfirm={handleEditCategory}
+          title="Rename Category"
+          label="Category Name"
+          placeholder="Enter category name…"
+          required
+          defaultValue={renamingCategory}
+        />
+      )}
+
+      {/* Edit Board Category Dialog */}
+      {editingCategoryBoardId && (
+        <TextInputDialog
+          isOpen={!!editingCategoryBoardId}
+          onClose={() => setEditingCategoryBoardId(null)}
+          onConfirm={handleEditBoardCategory}
+          title="Edit Category"
+          label="Category"
+          placeholder="Enter category name…"
+          required
+          defaultValue={(() => {
+            const board = boards.find(b => b.id === editingCategoryBoardId)
+            return board?.category || "Uncategorized"
+          })()}
         />
       )}
 
