@@ -10,7 +10,7 @@ fn setup_window_events(app: &tauri::App) {
   // Collect all command-line arguments (file paths from associations)
   let args: Vec<String> = std::env::args().filter(|a| a.ends_with(".md") || a.ends_with(".mdx")).collect();
   if !args.is_empty() {
-    let _ = app.emit_all("file-open", &args);
+    let _ = app.handle().emit("file-open", args);
   }
 }
 
