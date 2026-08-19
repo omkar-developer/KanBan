@@ -1,11 +1,11 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { useSettingsStore } from "../../state/settingsStore"
 import { useTheme } from "../../theme/useTheme"
 import type { Theme } from "../../theme/theme"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Tab = "appearance" | "cards" | "features" | "backups"
+type Tab = "appearance" | "cards" | "features" | "backups" | "api"
 
 interface Props {
   isOpen: boolean
@@ -316,7 +316,7 @@ function FeaturesTab() {
               onChange={v => setFeatures({ dueDateColors: v })}
             />
           </Row>
-          <Row label="Keyboard shortcuts">
+          <Row label="Keyboard shortcuts" hint="⌘K palette · ⌘F search · ⌘N new board">
             <Toggle
               checked={features.keyboardShortcuts}
               onChange={v => setFeatures({ keyboardShortcuts: v })}
@@ -624,6 +624,146 @@ function BackupsTab() {
   )
 }
 
+function ApiTab() {
+  const [token, setToken] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+  const [apiPort, setApiPort] = useState<number | null>(null)
+  const [apiRunning, setApiRunning] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core")
+        const current = await invoke<string>("get_api_token")
+        if (!cancelled) setToken(current ?? "")
+      } catch {
+        if (!cancelled) setToken("")
+      }
+    })()
+    ;(async () => {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core")
+        const port = await invoke<number>("get_api_port")
+        if (!cancelled) setApiPort(port)
+        const running = await invoke<boolean>("is_api_running")
+        if (!cancelled) setApiRunning(running)
+      } catch {
+        if (!cancelled) { setApiPort(null); setApiRunning(null) }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const protected_ = token !== null && token.trim().length > 0
+  const running_ = apiRunning === true && (apiPort ?? 0) > 0
+  const apiUrl = running_ && apiPort ? `http://127.0.0.1:${apiPort}` : null
+
+  async function save() {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core")
+      await invoke("set_api_token", { token: token ?? "" })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 1500)
+    } catch {}
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <SectionLabel>API</SectionLabel>
+        <div className="divide-y divide-white/[0.05]">
+          <Row
+            label="Bearer token"
+            hint={
+              protected_
+                ? "Protected — clients must send this token. Only local apps on this PC can access it."
+                : "Open access — any local process can read/write your boards and notes."
+            }
+          >
+            <input
+              type="text"
+              value={token ?? ""}
+              onChange={e => setToken(e.target.value)}
+              placeholder="Leave empty for no auth"
+              className="w-44 rounded-lg px-2 py-1 text-sm outline-none [color-scheme:dark]"
+              style={{
+                fontFamily: "var(--font-body, system-ui, sans-serif)",
+                backgroundColor: "var(--bg-input)",
+                borderColor: "var(--border)",
+                color: "var(--text-primary)",
+              }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = "var(--border-focus)" }}
+              onBlur={(e) => { e.currentTarget.style.borderColor = "var(--border)" }}
+            />
+          </Row>
+        </div>
+        <div className="flex items-center gap-3 mt-3">
+          <button
+            onClick={save}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+            style={{
+              backgroundColor: "var(--accent, #3b82f6)",
+              color: "#fff",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            Save token
+          </button>
+          {saved && <span className="text-xs" style={{ color: "var(--text-muted)" }}>Saved</span>}
+        </div>
+
+        {/* Connection info */}
+        {apiPort !== null ? (
+          <div className="mt-4 rounded-xl border p-4" style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-input)" }}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className={`inline-block w-2 h-2 rounded-full ${running_ ? "bg-green-400" : "bg-red-400"}`} />
+              <span className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+                {running_ ? "API Server Running" : "API Server Not Running"}
+              </span>
+            </div>
+            {apiUrl && (
+              <div className="rounded-lg p-2 flex items-center justify-between" style={{ backgroundColor: "var(--bg-column-solid)" }}>
+                <code className="text-xs font-mono" style={{ color: "var(--text-secondary)" }}>{apiUrl}</code>
+                <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                  Port: {apiPort}
+                </span>
+              </div>
+            )}
+            <p className="text-[11px] mt-2" style={{ color: "var(--text-muted)" }}>
+              {running_ && (
+                <>
+                  <strong>Endpoints:</strong> <code className="font-mono">GET {apiUrl}/api/boards</code>, <code className="font-mono">GET {apiUrl}/api/notes</code>, <code className="font-mono">GET {apiUrl}/health</code>
+                </>
+              )}
+              {!running_ && "The API server starts when the app launches. Check logs if it does not start."}
+            </p>
+          </div>
+        ) : (
+          <div className="mt-4 rounded-xl border p-4" style={{ borderColor: "var(--border)", backgroundColor: "var(--bg-input)" }}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-amber-400" />
+              <span className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+                API Not Available
+              </span>
+            </div>
+            <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+              The local API server is only available in the desktop app. Run the app through Tauri to use the API.
+            </p>
+          </div>
+        )}
+
+        <p className="text-[11px] mt-4 leading-relaxed" style={{ color: "var(--text-muted)" }}>
+          A local API (127.0.0.1) exposes your boards and notes to external tools
+          like AI assistants, MCP servers, or any HTTP client. Connection details are written
+          to ai-api.json next to this app's config.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // ── Main panel ────────────────────────────────────────────────────────────────
 
 const TABS: { id: Tab; label: string }[] = [
@@ -631,6 +771,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "cards",      label: "Cards" },
   { id: "features",   label: "Features" },
   { id: "backups",    label: "Backups" },
+  { id: "api",        label: "API" },
 ]
 
 export default function SettingsPanel({ isOpen, onClose }: Props) {
@@ -729,6 +870,7 @@ export default function SettingsPanel({ isOpen, onClose }: Props) {
           {tab === "cards"      && <CardsTab />}
           {tab === "features"   && <FeaturesTab />}
           {tab === "backups"    && <BackupsTab />}
+          {tab === "api"        && <ApiTab />}
         </div>
       </div>
     </div>,

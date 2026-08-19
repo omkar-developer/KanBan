@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useKanbanStore } from "../state/kanbanStore"
+import { BOARD_TEMPLATES } from "../models/templates"
 import {
   Circle, Square, Bookmark, Star, Zap, Flame, Lightbulb, Rocket,
   Bug, Wrench, ClipboardList, LayoutList, Inbox, Pencil, FileText,
@@ -61,18 +62,31 @@ const COLOR_OPTIONS = [
 ]
 
 export default function EmptyState({ onCreateBoard }: Props) {
+  const createBoardFromTemplate = useKanbanStore(s => s.createBoardFromTemplate)
   const [name, setName] = useState("")
   const [boardType, setBoardType] = useState<"kanban" | "notes">("kanban")
   const [category, setCategory] = useState("")
   const [selectedIcon, setSelectedIcon] = useState("circle")
   const [selectedColor, setSelectedColor] = useState("#3b82f6")
   const [iconTab, setIconTab] = useState<"icon" | "color">("icon")
+  const [creatingTemplate, setCreatingTemplate] = useState<string | null>(null)
 
   const handleCreate = async () => {
     if (!name.trim()) return
     await onCreateBoard(name.trim(), boardType, category.trim() || undefined, selectedIcon, selectedColor)
     setName("")
     setCategory("")
+  }
+
+  const handleTemplate = async (templateId: string) => {
+    const template = BOARD_TEMPLATES.find(t => t.id === templateId)
+    if (!template) return
+    setCreatingTemplate(templateId)
+    try {
+      await createBoardFromTemplate(template.name, template)
+    } finally {
+      setCreatingTemplate(null)
+    }
   }
 
   return (
@@ -91,6 +105,41 @@ export default function EmptyState({ onCreateBoard }: Props) {
           />
           <h1 className="text-3xl font-bold mb-3" style={{ color: "var(--text-primary)" }}>TaskFlow</h1>
           <p className="text-lg" style={{ color: "var(--text-secondary)" }}>Create your first board to get started</p>
+        </div>
+
+        {/* Template Quick Start */}
+        <div className="mb-6">
+          <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--text-muted)" }}>
+            Start from a template
+          </h2>
+          <div className="grid grid-cols-3 gap-3">
+            {BOARD_TEMPLATES.map(t => (
+              <button
+                key={t.id}
+                onClick={() => handleTemplate(t.id)}
+                disabled={creatingTemplate !== null}
+                title={t.description}
+                className="rounded-xl border p-4 text-left transition-all hover:scale-[1.02]"
+                style={{
+                  backgroundColor: "var(--bg-card)",
+                  borderColor: "var(--border)",
+                  cursor: creatingTemplate !== null ? "wait" : "pointer",
+                }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = "var(--border-hover)")}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = "var(--border)")}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: t.color ?? "#3b82f6" }} />
+                  <span className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
+                    {t.name}
+                  </span>
+                </div>
+                <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                  {t.type === "notes" ? "Notes" : "Kanban"} · {t.columns.length} columns
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Create Board Card */}

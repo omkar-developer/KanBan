@@ -3,6 +3,7 @@ import type { Board }    from "../models/Board"
 import type { Column }   from "../models/Column"
 import type { Task }     from "../models/Task"
 import type { Comment }  from "../models/Comment"
+import type { BoardTemplate } from "../models/templates"
 import { store } from "../storage/storage"
 import { createId }      from "../utils/id"
 
@@ -34,6 +35,7 @@ interface KanbanState {
   setShowArchived: (show: boolean) => void
 
   createBoard: (name: string, type?: "kanban" | "notes" | "tools", category?: string, icon?: string, color?: string) => Promise<void>
+  createBoardFromTemplate: (name: string, template: BoardTemplate, category?: string) => Promise<void>
   updateBoard: (board: Board) => Promise<void>
   deleteBoard: (boardId: string) => Promise<void>
   toggleFavorite: (boardId: string) => Promise<void>
@@ -110,6 +112,42 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
       color: color || undefined,
       createdAt: Date.now()
     })
+    await get().loadBoards()
+  },
+
+  async createBoardFromTemplate(name, template, category) {
+    const boardId = createId()
+    await store.createBoard({
+      id: boardId,
+      name,
+      type: template.type,
+      category: category || undefined,
+      icon: template.icon,
+      color: template.color,
+      createdAt: Date.now()
+    })
+
+    let colOrder = 1000
+    for (const col of template.columns) {
+      const colId = createId()
+      await store.createColumn({ id: colId, boardId, name: col.name, order: colOrder, icon: col.icon, color: col.color })
+      colOrder += 1000
+
+      let taskOrder = 1000
+      for (const t of col.tasks ?? []) {
+        await store.createTask({
+          id: createId(),
+          columnId: colId,
+          title: t.title,
+          description: t.description,
+          order: taskOrder,
+          createdAt: Date.now(),
+          ...(template.type === "notes" ? { type: "note" as const, data: { category: col.name } } : {}),
+        })
+        taskOrder += 1000
+      }
+    }
+
     await get().loadBoards()
   },
 

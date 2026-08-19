@@ -3,7 +3,9 @@ import SettingsPanel from "../ui/SettingsPanel"
 import FilterPanel from "../ui/FilterPanel"
 import DropdownMenu from "../ui/DropdownMenu"
 import ConfirmDialog from "../ui/ConfirmDialog"
+import HelpWindow from "../ui/HelpWindow"
 import { useKanbanStore } from "../../state/kanbanStore"
+import { useUIStore } from "../../state/uiStore"
 import {
   downloadBoardJSON,
   readFileAsText,
@@ -85,9 +87,8 @@ function IconFilter() {
 function IconSettings() {
   return (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6.5 2L9.5 2 9 4 11 5.5 13 3.5 14 5 12 7 14 9 12.5 10 14.5 12 12.5 14 11 13.5 9 14 8.5 16 5.5 16 6 14 4 12.5 2 14.5 1 13 3.5 11 1.5 9 0 9.5 1 8 3.5 6 2 4.5 3 3 5 3.5 5.5 2Z" />
       <circle cx="8" cy="8" r="2.5" strokeWidth={1.5} />
-      <path strokeLinecap="round" strokeWidth={1.5}
-        d="M8 2v1.5M8 12.5V14M2 8h1.5M12.5 8H14M3.5 3.5l1 1M11.5 11.5l1 1M12.5 3.5l-1 1M4.5 11.5l-1 1" />
     </svg>
   )
 }
@@ -97,6 +98,14 @@ function IconDots() {
       <circle cx="8" cy="3.5" r="1.5" />
       <circle cx="8" cy="8"   r="1.5" />
       <circle cx="8" cy="12.5" r="1.5" />
+    </svg>
+  )
+}
+function IconHelp() {
+  return (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 16 16">
+      <circle cx="8" cy="8" r="6" strokeWidth={1.5} />
+      <path strokeLinecap="round" strokeWidth={1.5} d="M6.5 6.5a1.5 1.5 0 013 0c0 1.5-3 2-3 3.5M8 12.5h.01" />
     </svg>
   )
 }
@@ -188,6 +197,8 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
   const [showRestoreDialog,     setShowRestoreDialog]     = useState(false)
   const [pendingBackupData,     setPendingBackupData]     = useState<DatabaseBackup | null>(null)
 
+  const openHelp = useUIStore(s => s.openHelp)
+
   const boards       = useKanbanStore(s => s.boards)
   const columns      = useKanbanStore(s => s.columns)
   const tasks        = useKanbanStore(s => s.tasks)
@@ -209,14 +220,19 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
   const importExportMenuRef = useRef<HTMLButtonElement>(null)
   const searchInputRef      = useRef<HTMLInputElement>(null)
 
-  // Expand search on Cmd/Ctrl+K
+  // Focus search when the global shortcuts hook requests it (⌘/Ctrl+F)
+  useEffect(() => {
+    const onFocusSearch = () => {
+      setSearchExpanded(true)
+      setTimeout(() => searchInputRef.current?.focus(), 50)
+    }
+    window.addEventListener("kanban:focus-search", onFocusSearch)
+    return () => window.removeEventListener("kanban:focus-search", onFocusSearch)
+  }, [])
+
+  // Close search on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault()
-        setSearchExpanded(true)
-        setTimeout(() => searchInputRef.current?.focus(), 50)
-      }
       if (e.key === "Escape" && searchExpanded) {
         setSearchExpanded(false)
         setSearchInput("")
@@ -573,6 +589,11 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
 
         <Sep />
 
+        {/* ── Help ─────────────────────────────────────────────────── */}
+        <IconBtn onClick={openHelp} title="Help & Keyboard Shortcuts">
+          <IconHelp />
+        </IconBtn>
+
         {/* ── Settings ───────────────────────────────────────────────── */}
         <IconBtn onClick={handleSettingsClick} title="Settings">
           <IconSettings />
@@ -629,6 +650,7 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
         onClose={() => setFilterOpen(false)}
       />
       <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <HelpWindow />
     </>
   )
 }
@@ -750,7 +772,7 @@ const SearchBar = forwardRef<HTMLInputElement, {
         onClick={onExpand}
         onMouseEnter={() => setHov(true)}
         onMouseLeave={() => setHov(false)}
-        title="Search (⌘K)"
+        title="Search (⌘F)"
         style={{
           display: "flex", alignItems: "center", gap: 6,
           padding: "5px 10px", borderRadius: 8, border: "none", cursor: "pointer",
@@ -771,7 +793,7 @@ const SearchBar = forwardRef<HTMLInputElement, {
           borderRadius: 4, padding: "1px 4px",
           border: "1px solid var(--border)",
           letterSpacing: "0.02em",
-        }}>⌘K</span>
+        }}>⌘F</span>
       </button>
     )
   }

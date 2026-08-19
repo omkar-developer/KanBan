@@ -22,7 +22,8 @@
     ],
     "security": {
       "csp": null
-    }
+    },
+    "withGlobalTauri": true
   },
   "bundle": {
     "active": true,
@@ -33,6 +34,18 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "name": "markdown",
+        "ext": ["md"],
+        "mimeType": "text/markdown"
+      },
+      {
+        "name": "markdown",
+        "ext": ["mdx"],
+        "mimeType": "text/markdown"
+      }
     ]
   },
   "plugins": {

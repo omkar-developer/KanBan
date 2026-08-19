@@ -11,6 +11,8 @@ import CreateNoteDialog from "../ui/CreateNoteDialog"
 import CategoryEditDialog from "../ui/CategoryEditDialog"
 import DropdownMenu, { type MenuItem } from "../ui/DropdownMenu"
 import BacklinksSection from "../notes/BacklinksSection"
+import { exportNoteMarkdown, openMarkdownFile } from "../../utils/exportImport"
+import { useSettingsStore } from "../../state/settingsStore"
 import type { Task } from "../../models/Task"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -157,26 +159,64 @@ export default function NotesView() {
     setIsDirty(false)
   }, [selectedNoteId, noteContent, noteTags])
 
+  // Open a .md file directly into the current note (or create a new note from it)
+  const handleOpenMd = useCallback(async () => {
+    const file = await openMarkdownFile()
+    if (!file) return
+    if (selectedNote) {
+      // Load into the currently open note
+      setNoteContent(file.content)
+      setIsDirty(true)
+    } else if (activeBoard) {
+      // No note open → create a new note with the file's content
+      const colName = file.title.trim() ? file.title : "Notes"
+      let col = columns.find(c => c.boardId === activeBoard.id && c.name === colName)
+      if (!col) {
+        await useKanbanStore.getState().createColumn(activeBoard.id, colName)
+        col = useKanbanStore.getState().columns.find(c => c.boardId === activeBoard.id && c.name === colName)
+      }
+      const colId = col?.id ?? columns.find(c => c.boardId === activeBoard.id)?.id
+      if (!colId) return
+      await useKanbanStore.getState().createTask(colId, file.title, {
+        type: "note",
+        description: file.content || undefined,
+        data: { category: colName },
+      })
+      const newNote = useKanbanStore.getState().tasks.find(t => t.title === file.title && t.type === "note")
+      if (newNote) setSelectedNoteId(newNote.id)
+    }
+  }, [selectedNote, activeBoard, columns])
+
   // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+      const enabled = useSettingsStore.getState().settings.features.keyboardShortcuts
+      if (enabled && (e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault()
         handleSaveNow()
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === "e") {
+      if (enabled && (e.metaKey || e.ctrlKey) && e.key === "e") {
         e.preventDefault()
         setViewMode(v => v === "edit" ? "preview" : v === "preview" ? "split" : "edit")
       }
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "d") {
+      if (enabled && (e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "d") {
         e.preventDefault()
         setDocWidthMode(v => !v)
+      }
+      if (enabled && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "o") {
+        e.preventDefault()
+        handleOpenMd()
       }
       if (e.key === "Escape" && focusMode) setFocusMode(false)
     }
     document.addEventListener("keydown", handler)
     return () => document.removeEventListener("keydown", handler)
-  }, [focusMode, noteContent, noteTags, selectedNoteId, handleSaveNow])
+  }, [focusMode, noteContent, noteTags, selectedNoteId, handleSaveNow, handleOpenMd])
+
+  const handleExportMd = useCallback(() => {
+    if (!selectedNote) return
+    exportNoteMarkdown(selectedNote.title, noteContent)
+  }, [selectedNote, noteContent])
 
   const handleExportPdf = useCallback(() => {
     if (!selectedNote) return
@@ -395,6 +435,17 @@ export default function NotesView() {
         },
       },
       { separator: true },
+      {
+        label: "Export as Markdown",
+        icon: (
+          <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v10m0 0l-3.5-3.5M12 13l3.5-3.5M5 20h14" />
+          </svg>
+        ),
+        onClick: () => {
+          exportNoteMarkdown(task.title, task.description ?? "")
+        },
+      },
       {
         label: "Delete",
         icon: (
@@ -893,8 +944,29 @@ export default function NotesView() {
                     {/* Export PDF */}
                     <HeaderBtn title="Export as PDF" onClick={() => setShowPdfOptions(true)}>
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 14 14">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M7 1.5v6m0 0L4.5 5m2.5 2.5L9.5 5" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M1.5 9.5v1A2 2 0 003.5 12.5h7a2 2 0 002-2v-1" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M1 1.5h8l3 3v8a1 1 0 01-1 1H1a1 1 0 01-1-1v-10a1 1 0 011-1z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M9.5 1.5v3h3" />
+                        <path d="M3 8.5a1.5 1.5 0 103 0 1.5 1.5 0 013 0 1.5 1.5 0 103 0" strokeWidth={1.2} />
+                      </svg>
+                    </HeaderBtn>
+
+                    {/* Export Markdown */}
+                    <HeaderBtn title="Export as Markdown (.md)" onClick={handleExportMd}>
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 14 14">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M1 1.5h8l3 3v8a1 1 0 01-1 1H1a1 1 0 01-1-1v-10a1 1 0 011-1z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M9.5 1.5v3h3" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M4 8.5l2 1.5 2-3" />
+                      </svg>
+                    </HeaderBtn>
+
+                    {/* Open Markdown */}
+                    <HeaderBtn
+                      title="Open .md file — load it into this note (or create a new one)"
+                      onClick={handleOpenMd}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 14 14">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M1 4.5V11a1 1 0 001 1h10a1 1 0 001-1V5.5l-1.5-2H8L6.5 3H2a1 1 0 00-1 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M7 7.5v3m0 0l-1.5-1.5M7 10.5l1.5-1.5" />
                       </svg>
                     </HeaderBtn>
 

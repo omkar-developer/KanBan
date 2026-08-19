@@ -1,6 +1,8 @@
 import { useKanbanStore } from "../../state/kanbanStore"
+import { useUIStore } from "../../state/uiStore"
 import { useState, useEffect, useRef } from "react"
 import type { Board } from "../../models/Board"
+import { BOARD_TEMPLATES } from "../../models/templates"
 import ExplorerTree from "../ui/ExplorerTree"
 import EditBoardDialog from "../ui/EditBoardDialog"
 import ConfirmDialog from "../ui/ConfirmDialog"
@@ -69,6 +71,7 @@ const COLOR_OPTIONS = [
 export default function Sidebar({ onSelectBoard }: SidebarProps) {
   const boards = useKanbanStore(s => s.boards)
   const createBoard = useKanbanStore(s => s.createBoard)
+  const createBoardFromTemplate = useKanbanStore(s => s.createBoardFromTemplate)
   const toggleFavorite = useKanbanStore(s => s.toggleFavorite)
 
   const [newBoardName, setNewBoardName] = useState("")
@@ -102,13 +105,19 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
   const [modalIcon, setModalIcon] = useState("circle")
   const [modalColor, setModalColor] = useState("#3b82f6")
   const [iconTab, setIconTab] = useState<"icon" | "color">("icon")
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
 
   const handleCreateBoard = async () => {
     if (!newBoardName.trim()) {
       return
     }
     try {
-      await createBoard(newBoardName.trim(), modalType, modalCategory || undefined, modalIcon, modalColor)
+      const template = BOARD_TEMPLATES.find(t => t.id === selectedTemplate)
+      if (template) {
+        await createBoardFromTemplate(newBoardName.trim(), template, modalCategory || undefined)
+      } else {
+        await createBoard(newBoardName.trim(), modalType, modalCategory || undefined, modalIcon, modalColor)
+      }
     } catch (error) {
       console.error('[Sidebar] Error creating board:', error)
     }
@@ -118,6 +127,22 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
     setModalCategory("")
     setModalIcon("circle")
     setModalColor("#3b82f6")
+    setSelectedTemplate(null)
+  }
+
+  const handlePickTemplate = (templateId: string) => {
+    if (selectedTemplate === templateId) {
+      setSelectedTemplate(null)
+      return
+    }
+    const t = BOARD_TEMPLATES.find(x => x.id === templateId)
+    setSelectedTemplate(templateId)
+    if (t) {
+      setNewBoardName(t.name)
+      setModalType(t.type)
+      setModalIcon(t.icon ?? "circle")
+      setModalColor(t.color ?? "#3b82f6")
+    }
   }
 
   const renderCategoryHeader = (
@@ -201,6 +226,7 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
     setShowCreateModal(true)
     setModalType(type)
     setModalCategory(category)
+    setSelectedTemplate(null)
   }
 
   const handleToggleFavorite = (boardId: string, e: React.MouseEvent) => {
@@ -277,6 +303,16 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
       setTimeout(() => modalRef.current?.focus(), 50)
     }
   }, [showCreateModal])
+
+  // Open the create modal when the command palette / shortcuts request it
+  const createBoardOpen = useUIStore(s => s.createBoardOpen)
+  const closeCreateBoard = useUIStore(s => s.closeCreateBoard)
+  useEffect(() => {
+    if (createBoardOpen) {
+      setShowCreateModal(true)
+      closeCreateBoard()
+    }
+  }, [createBoardOpen, closeCreateBoard])
 
   // Separate boards by type (treat undefined/empty type as "kanban")
   const kanbanBoards = boards.filter(b => !b.type || b.type === "kanban")
@@ -570,6 +606,7 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
                 setModalCategory("")
                 setModalIcon("circle")
                 setModalColor("#3b82f6")
+                setSelectedTemplate(null)
               }}
               className="w-full px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
               style={{
@@ -718,6 +755,47 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
             </div>
 
             <div className="space-y-4">
+              {/* Templates */}
+              <div>
+                <label className="block text-sm mb-2 font-medium" style={{ color: "var(--text-muted)" }}>
+                  Templates <span style={{ opacity: 0.6 }}>(optional)</span>
+                </label>
+                <div className="grid grid-cols-3 gap-1.5 max-h-32 overflow-y-auto p-2 rounded-lg border"
+                  style={{ backgroundColor: "var(--bg-input)", borderColor: "var(--border)" }}>
+                  {BOARD_TEMPLATES.map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => handlePickTemplate(t.id)}
+                      title={t.description}
+                      className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[11px] font-medium transition"
+                      style={{
+                        backgroundColor: selectedTemplate === t.id ? "var(--accent)" : "transparent",
+                        color: selectedTemplate === t.id ? "#fff" : "var(--text-secondary)",
+                        border: `1px solid ${selectedTemplate === t.id ? "transparent" : "var(--border)"}`,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedTemplate !== t.id) {
+                          e.currentTarget.style.backgroundColor = "var(--bg-column-solid)"
+                          e.currentTarget.style.color = "var(--text-primary)"
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedTemplate !== t.id) {
+                          e.currentTarget.style.backgroundColor = "transparent"
+                          e.currentTarget.style.color = "var(--text-secondary)"
+                        }
+                      }}
+                    >
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: t.color ?? "#3b82f6" }} />
+                      <span className="truncate">{t.name}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                  Picking a template pre-fills the board with starter columns.
+                </p>
+              </div>
+
               {/* Board Name */}
               <div>
                 <label className="block text-sm mb-2 font-medium" style={{ color: "var(--text-muted)" }}>Name</label>

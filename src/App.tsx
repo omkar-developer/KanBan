@@ -3,7 +3,11 @@ import { useKanbanStore } from "./state/kanbanStore"
 import MainLayout from "./components/layout/MainLayout"
 import BoardPage from "./pages/BoardPage"
 import EmptyState from "./pages/EmptyState"
+import CommandPalette from "./components/ui/CommandPalette"
+import FilePreviewDialog from "./components/ui/FilePreviewDialog"
 import { useAutoBackup } from "./hooks/useAutoBackup"
+import { useGlobalShortcuts } from "./hooks/useGlobalShortcuts"
+import { useFileOpenHandler } from "./hooks/useFileOpenHandler"
 
 const LAST_BOARD_KEY      = "kanban-last-board"
 const LAST_BOARD_TYPE_KEY = "kanban-last-board-type"
@@ -21,6 +25,8 @@ function App() {
   )
 
   useAutoBackup()
+  useGlobalShortcuts()
+  const { fileToOpen, closeDialog } = useFileOpenHandler()
 
   // Load boards on mount, then validate saved board still exists and set viewMode
   useEffect(() => {
@@ -97,15 +103,19 @@ function App() {
   if (selectedBoardId) {
     const selectedBoard = boards.find(b => b.id === selectedBoardId)
     return (
-      <MainLayout boardName={selectedBoard?.name} boardId={selectedBoardId} onBoardChange={handleSelectBoard}>
-        <BoardPage boardId={selectedBoardId} />
-      </MainLayout>
+        <MainLayout boardName={selectedBoard?.name} boardId={selectedBoardId} onBoardChange={handleSelectBoard}>
+          <BoardPage boardId={selectedBoardId} />
+          <CommandPalette onSelectBoard={handleSelectBoard} />
+          {fileToOpen && <FilePreviewDialog filePath={fileToOpen} onClose={closeDialog} />}
+        </MainLayout>
     )
   }
 
   return (
     <MainLayout onBoardChange={handleSelectBoard}>
       <EmptyState onCreateBoard={handleCreateBoard} />
+      <CommandPalette onSelectBoard={handleSelectBoard} />
+      {fileToOpen && <FilePreviewDialog filePath={fileToOpen} onClose={closeDialog} />}
     </MainLayout>
   )
 }

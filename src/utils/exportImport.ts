@@ -265,6 +265,76 @@ export async function importMdFolderTauri(): Promise<MdImportResult | null> {
   return parseMdEntries(boardName, mdEntries)
 }
 
+// ─── Single note .md export ───────────────────────────────────────────────────
+
+/**
+ * Open a single markdown file and return its content plus a suggested title
+ * (the filename without extension). Uses the Tauri file dialog in the desktop
+ * app, or a hidden <input type="file"> in the browser.
+ */
+export async function openMarkdownFile(): Promise<{ title: string; content: string } | null> {
+  if (isTauri()) {
+    const { open } = await import("@tauri-apps/plugin-dialog")
+    const { readTextFile } = await import("@tauri-apps/plugin-fs")
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: "Markdown", extensions: ["md", "markdown", "txt"] }],
+      title: "Open Markdown File",
+    })
+    if (!selected || typeof selected !== "string") return null
+    const content = await readTextFile(selected)
+    const basename = selected.replace(/\\/g, "/").split("/").pop() ?? "Untitled"
+    return { title: basename.replace(/\.(md|markdown|txt)$/i, ""), content }
+  }
+
+  // Browser fallback
+  const content = await new Promise<string | null>((resolve) => {
+    const input = document.createElement("input")
+    input.type = "file"
+    input.accept = ".md,.markdown,.txt"
+    input.onchange = () => {
+      const file = input.files?.[0]
+      if (!file) return resolve(null)
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result ?? ""))
+      reader.onerror = () => resolve(null)
+      reader.readAsText(file)
+    }
+    input.click()
+  })
+  if (content === null) return null
+  return { title: "Imported Note", content }
+}
+
+/**
+ * Export a single note as a markdown file (Tauri save dialog or browser download).
+ */
+export async function exportNoteMarkdown(title: string, content: string): Promise<void> {
+  const body = `# ${title}\n\n${content}`.trimEnd() + "\n"
+  const filename = `${title.replace(/[\\/:*?"<>|]/g, "-").trim()}.md`
+  if (isTauri()) {
+    const { save } = await import("@tauri-apps/plugin-dialog")
+    const { writeTextFile } = await import("@tauri-apps/plugin-fs")
+    const filePath = await save({
+      defaultPath: filename,
+      filters: [{ name: "Markdown", extensions: ["md"] }],
+      title: "Export Note",
+    })
+    if (!filePath) return
+    await writeTextFile(filePath, body)
+  } else {
+    const blob = new Blob([body], { type: "text/markdown" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+}
+
 // ─── MD Folder export ─────────────────────────────────────────────────────────
 
 /**
