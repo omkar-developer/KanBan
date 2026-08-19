@@ -17,6 +17,7 @@ interface KanbanState {
   searchQuery: string // Global search query
   viewMode:    'board' | 'list' | 'grid' | 'archive' | 'notes' // Current view mode
   showArchived: boolean // Toggle to show archived tasks
+  archiveFilter: "active" | "archived" // View mode for archived tasks
 
   loadBoards:  () => Promise<void>
   loadBoard:   (boardId: string) => Promise<void>
@@ -33,11 +34,16 @@ interface KanbanState {
   
   // Archive toggle
   setShowArchived: (show: boolean) => void
+  
+  // Archive filter (3-way toggle)
+  setArchiveFilter: (filter: "active" | "archived") => void
 
   createBoard: (name: string, type?: "kanban" | "notes" | "tools", category?: string, icon?: string, color?: string) => Promise<void>
   createBoardFromTemplate: (name: string, template: BoardTemplate, category?: string) => Promise<void>
   updateBoard: (board: Board) => Promise<void>
   deleteBoard: (boardId: string) => Promise<void>
+  archiveBoard: (boardId: string) => Promise<void>
+  unarchiveBoard: (boardId: string) => Promise<void>
   toggleFavorite: (boardId: string) => Promise<void>
   createColumn:(boardId: string, name: string) => Promise<void>
   updateColumn:(column: Column) => Promise<void>
@@ -60,7 +66,7 @@ interface KanbanState {
 }
 
 export const useKanbanStore = create<KanbanState>((set, get) => ({
-  boards: [], columns: [], tasks: [], activeBoard: undefined, activeTags: [], searchQuery: "", viewMode: (localStorage.getItem('kanban-last-board-type') === 'notes' ? 'notes' : 'board'), showArchived: false,
+  boards: [], columns: [], tasks: [], activeBoard: undefined, activeTags: [], searchQuery: "", viewMode: (localStorage.getItem('kanban-last-board-type') === 'notes' ? 'notes' : 'board'),   showArchived: false, archiveFilter: "active",
 
   async loadBoards() {
     const boards = await store.getBoards()
@@ -78,6 +84,9 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
   
   // Archive toggle
   setShowArchived: (show: boolean) => set({ showArchived: show }),
+  
+  // Archive filter (3-way toggle)
+  setArchiveFilter: (filter: "active" | "archived") => set({ archiveFilter: filter }),
   
   toggleTag: (tag) => set(s => {
     const exists = s.activeTags.includes(tag)
@@ -165,6 +174,22 @@ export const useKanbanStore = create<KanbanState>((set, get) => ({
     const board = get().boards.find(b => b.id === boardId)
     if (!board) return
     const updated = { ...board, favorite: !board.favorite }
+    await store.updateBoard(updated)
+    set(s => ({ boards: s.boards.map(b => b.id === boardId ? updated : b) }))
+  },
+
+  async archiveBoard(boardId) {
+    const board = get().boards.find(b => b.id === boardId)
+    if (!board) return
+    const updated = { ...board, archived: true, updatedAt: Date.now() }
+    await store.updateBoard(updated)
+    set(s => ({ boards: s.boards.map(b => b.id === boardId ? updated : b) }))
+  },
+
+  async unarchiveBoard(boardId) {
+    const board = get().boards.find(b => b.id === boardId)
+    if (!board) return
+    const updated = { ...board, archived: false, updatedAt: Date.now() }
     await store.updateBoard(updated)
     set(s => ({ boards: s.boards.map(b => b.id === boardId ? updated : b) }))
   },

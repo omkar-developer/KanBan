@@ -282,6 +282,8 @@ export default function ListView() {
   const setActiveTags = useKanbanStore(s => s.setActiveTags)
   const toggleTag     = useKanbanStore(s => s.toggleTag)
   const showArchived  = useKanbanStore(s => s.showArchived)
+  const archiveFilter = useKanbanStore(s => s.archiveFilter)
+  const setArchiveFilter = useKanbanStore(s => s.setArchiveFilter)
   const updateTask    = useKanbanStore(s => s.updateTask)
   const deleteTask    = useKanbanStore(s => s.deleteTask)
   const archiveTask   = useKanbanStore(s => s.archiveTask)
@@ -315,7 +317,8 @@ export default function ListView() {
     const effectiveSearch = localSearch || searchQuery
 
     const result = tasks.filter(task => {
-      if (!showArchived && isArchived(task)) return false
+      if (archiveFilter === "archived" && !isArchived(task)) return false
+      if (archiveFilter === "active" && isArchived(task)) return false
       if (activeTags.length > 0 && !task.tags?.some(t => activeTags.includes(t))) return false
       if (filterPriority !== "all" && (task.priority ?? "low") !== filterPriority) return false
       if (filterType !== "all" && (task.type ?? "task") !== filterType) return false
@@ -346,7 +349,7 @@ export default function ListView() {
       }
       return sortDir === "asc" ? cmp : -cmp
     })
-  }, [tasks, activeTags, searchQuery, localSearch, showArchived, sortKey, sortDir, filterPriority, filterType, filterColumn, getColumnName])
+  }, [tasks, activeTags, searchQuery, localSearch, archiveFilter, sortKey, sortDir, filterPriority, filterType, filterColumn, getColumnName])
 
   // ── Selection helpers ─────────────────────────────────────────────────────
   const allSelected   = filteredTasks.length > 0 && filteredTasks.every(t => selectedIds.has(t.id))
@@ -650,7 +653,7 @@ export default function ListView() {
         onToggleTag={toggleTag}
         onClearTags={() => setActiveTags([])}
         taskCount={filteredTasks.length}
-        totalCount={tasks.filter(t => showArchived || !isArchived(t)).length}
+        totalCount={tasks.length}
       />
 
       {/* ── Bulk action bar (shown when rows selected) ─────────────────────── */}
@@ -778,6 +781,7 @@ export default function ListView() {
                   <Th label="Priority" sortable field="priority" width="110px" />
                   <Th label="Type" sortable field="type" width="100px" />
                   <Th label="Due" sortable field="dueDate" width="100px" />
+                  <Th label="Created" sortable field="createdAt" width="110px" />
                   <Th label="Updated" sortable field="updatedAt" width="110px" />
                   <Th label="Tags" width="180px" />
                   {/* Actions column */}
@@ -887,6 +891,13 @@ export default function ListView() {
                         ) : (
                           <span className="text-xs" style={{ color: "var(--text-muted)" }}>—</span>
                         )}
+                      </td>
+
+                      {/* Created */}
+                      <td className="px-4" style={{ paddingTop: densityCompact ? 8 : 14, paddingBottom: densityCompact ? 8 : 14 }}>
+                        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                          {new Date(task.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "2-digit" })}
+                        </span>
                       </td>
 
                       {/* Updated */}

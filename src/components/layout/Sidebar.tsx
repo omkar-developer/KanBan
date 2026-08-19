@@ -15,7 +15,7 @@ import {
   Tag, Telescope, Headphones, FileJson2, HardDrive, Megaphone, Mic,
   Shield, ShoppingCart, Tv2, Umbrella, Video, Wallet, Wheat, Wifi,
   Wind, ZapOff, ZoomIn, ZoomOut, Atom, Binary, Cpu, Palette, PenLine,
-  Sprout, Triangle, Scan, GalleryVertical
+  Sprout, Triangle, Scan, GalleryVertical, Archive, Search, Kanban
 } from "lucide-react"
 
 interface SidebarProps {
@@ -112,6 +112,12 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
   const createBoard = useKanbanStore(s => s.createBoard)
   const createBoardFromTemplate = useKanbanStore(s => s.createBoardFromTemplate)
   const toggleFavorite = useKanbanStore(s => s.toggleFavorite)
+  const archiveBoard = useKanbanStore(s => s.archiveBoard)
+  const unarchiveBoard = useKanbanStore(s => s.unarchiveBoard)
+
+  const [showArchived, setShowArchived] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [boardFilter, setBoardFilter] = useState<"kanban" | "notes" | "all">("all")
 
   const [newBoardName, setNewBoardName] = useState("")
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -354,9 +360,23 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
   }, [createBoardOpen, closeCreateBoard])
 
   // Separate boards by type (treat undefined/empty type as "kanban")
-  const kanbanBoards = boards.filter(b => !b.type || b.type === "kanban")
-  const notesBoards = boards.filter(b => b.type === "notes")
-  const favoriteBoards = boards.filter(b => b.favorite)
+  const filteredBoards = boards.filter(b => {
+    if (showArchived && !b.archived) return false
+    if (!showArchived && b.archived) return false
+    if (boardFilter === "kanban" && b.type === "notes") return false
+    if (boardFilter === "notes" && (!b.type || b.type === "kanban")) return false
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      if (!b.name.toLowerCase().includes(q) && !(b.category || "").toLowerCase().includes(q)) return false
+    }
+    return true
+  })
+
+  const kanbanBoards = filteredBoards.filter(b => !b.type || b.type === "kanban")
+  const notesBoards = filteredBoards.filter(b => b.type === "notes")
+  const favoriteBoards = filteredBoards.filter(b => b.favorite)
+  const archivedKanbanBoards = filteredBoards.filter(b => b.archived && (!b.type || b.type === "kanban"))
+  const archivedNotesBoards = filteredBoards.filter(b => b.archived && b.type === "notes")
 
   const getBoardIcon = (board: Board) => {
     if (board.icon) {
@@ -511,6 +531,53 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
                 </svg>
                 Edit
               </button>
+              {board.archived ? (
+                <button
+                  onClick={() => {
+                    unarchiveBoard(board.id)
+                    setMenuOpenBoardId(null)
+                  }}
+                  className="w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2"
+                  style={{
+                    color: 'var(--text-secondary)',
+                    backgroundColor: 'transparent',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-input)'
+                    e.currentTarget.style.color = 'var(--text-primary)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                    e.currentTarget.style.color = 'var(--text-secondary)'
+                  }}
+                >
+                  <Archive className="w-4 h-4" />
+                  Unarchive
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    archiveBoard(board.id)
+                    setMenuOpenBoardId(null)
+                  }}
+                  className="w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2"
+                  style={{
+                    color: 'var(--text-secondary)',
+                    backgroundColor: 'transparent',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-input)'
+                    e.currentTarget.style.color = 'var(--text-primary)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                    e.currentTarget.style.color = 'var(--text-secondary)'
+                  }}
+                >
+                  <Archive className="w-4 h-4" />
+                  Archive
+                </button>
+              )}
               <button
                 onClick={() => {
                   setEditingCategoryBoardId(board.id)
@@ -564,7 +631,12 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
 
   return (
     <>
-        <div 
+      <style>{`
+        .sidebar-search::placeholder {
+          color: var(--text-muted) !important;
+        }
+      `}</style>
+      <div 
         className="flex flex-col h-full border-r transition-all duration-300"
         style={{
           backgroundColor: 'var(--bg-app)',
@@ -635,44 +707,71 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
           )}
         </div>
 
-        {/* New Board Section */}
+        {/* Search & Filter Bar */}
         {!isCollapsed && (
-          <div className="p-4" style={{ borderBottom: `1px solid var(--border)` }}>
-            <label className="block text-xs mb-2" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>NEW</label>
-            <button
-              onClick={() => {
-                setShowCreateModal(true)
-                setModalType("kanban")
-                setModalCategory("")
-                setModalIcon("circle")
-                setModalColor("#3b82f6")
-                setSelectedTemplate(null)
-              }}
-              className="w-full px-3 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center justify-center gap-2"
-              style={{
-                backgroundColor: 'var(--accent)',
-                color: '#fff',
-                transform: "scale(1)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "var(--accent-muted)"
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "var(--accent)"
-                e.currentTarget.style.transform = "scale(1)"
-              }}
-              onMouseDown={(e) => {
-                e.currentTarget.style.transform = "scale(0.98)"
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = "scale(1)"
-              }}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Create
-            </button>
+          <div className="px-3 py-2 space-y-2" style={{ borderBottom: `1px solid var(--border)` }}>
+            {/* Create + Search */}
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => {
+                  setShowCreateModal(true)
+                  setModalType("kanban")
+                  setModalCategory("")
+                  setModalIcon("circle")
+                  setModalColor("#3b82f6")
+                  setSelectedTemplate(null)
+                }}
+                className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                style={{ color: "var(--text-secondary)" }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "var(--bg-input)" }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent" }}
+                title="Create new board"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+              <div className="flex-1 relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: "var(--text-muted)" }} />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search boards..."
+                  className="w-full pl-7 pr-2 py-1.5 text-xs rounded-lg border-0 outline-none transition-colors sidebar-search"
+                  style={{
+                    backgroundColor: "var(--bg-input)",
+                    color: "var(--text-primary)",
+                  }}
+                />
+              </div>
+            </div>
+            {/* Filter Buttons */}
+            <div className="flex gap-1">
+              {([
+                { key: "all", label: "All" },
+                { key: "kanban", label: "Kanban" },
+                { key: "notes", label: "Notes" },
+              ] as const).map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setBoardFilter(key)}
+                  className="flex-1 px-2 py-1 text-[10px] font-medium rounded-md transition-colors"
+                  style={{
+                    backgroundColor: boardFilter === key ? "var(--accent)" : "transparent",
+                    color: boardFilter === key ? "#fff" : "var(--text-muted)",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (boardFilter !== key) e.currentTarget.style.backgroundColor = "var(--bg-input)"
+                  }}
+                  onMouseLeave={(e) => {
+                    if (boardFilter !== key) e.currentTarget.style.backgroundColor = "transparent"
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -715,47 +814,132 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
           ) : (
             // Expanded state - show all sections
             <div className="space-y-6">
-              {/* Favorites Section */}
-              {favoriteBoards.length > 0 && (
-                <div className="space-y-2">
-                  <label className="block text-xs mb-2" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>FAVORITES</label>
-                  {favoriteBoards.map(board => renderBoardItem(board, 'fav-'))}
-                </div>
+              {/* Archive Toggle */}
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-medium" style={{ color: 'var(--text-muted)' }}>BOARDS</label>
+                <button
+                  onClick={() => setShowArchived(!showArchived)}
+                  className="flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors"
+                  style={{
+                    backgroundColor: showArchived ? 'var(--accent)' : 'transparent',
+                    color: showArchived ? '#fff' : 'var(--text-muted)',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!showArchived) {
+                      e.currentTarget.style.backgroundColor = 'var(--bg-input)'
+                      e.currentTarget.style.color = 'var(--text-primary)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!showArchived) {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                      e.currentTarget.style.color = 'var(--text-muted)'
+                    }
+                  }}
+                  title={showArchived ? "Show active boards" : "Show archived boards"}
+                >
+                  <Archive className="w-3 h-3" />
+                  <span>Archived</span>
+                  <span style={{
+                    fontSize: 9,
+                    padding: '0 4px',
+                    borderRadius: 6,
+                    backgroundColor: showArchived ? 'rgba(255,255,255,0.2)' : 'var(--bg-input)',
+                  }}>
+                    {boards.filter(b => b.archived).length}
+                  </span>
+                </button>
+              </div>
+
+              {/* Archived Boards Section */}
+              {showArchived && (
+                <>
+                  {archivedKanbanBoards.length > 0 && (
+                    <div className="space-y-2">
+                      <label className="block text-xs mb-2" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>KANBAN BOARDS</label>
+                      <ExplorerTree<Board>
+                        items={archivedKanbanBoards.map(board => ({ ...board, category: board.category || "Uncategorized" }))}
+                        groupKey="category"
+                        onCreate={undefined}
+                        renderGroupHeader={renderCategoryHeader}
+                        renderItem={(board) => (
+                          <div className="opacity-60 hover:opacity-100 transition-opacity">
+                            {renderBoardItem(board, 'arch-kanban-')}
+                          </div>
+                        )}
+                      />
+                    </div>
+                  )}
+                  {archivedNotesBoards.length > 0 && (
+                    <div className="space-y-2">
+                      <label className="block text-xs mb-2" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>NOTES</label>
+                      <ExplorerTree<Board>
+                        items={archivedNotesBoards.map(board => ({ ...board, category: board.category || "Uncategorized" }))}
+                        groupKey="category"
+                        onCreate={undefined}
+                        renderGroupHeader={renderCategoryHeader}
+                        renderItem={(board) => (
+                          <div className="opacity-60 hover:opacity-100 transition-opacity">
+                            {renderBoardItem(board, 'arch-notes-')}
+                          </div>
+                        )}
+                      />
+                    </div>
+                  )}
+                  {filteredBoards.filter(b => b.archived).length === 0 && (
+                    <div className="text-center py-4">
+                      <p style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>No archived boards</p>
+                    </div>
+                  )}
+                </>
               )}
 
-              {/* Kanban Boards */}
-              {kanbanBoards.length > 0 && (
-                <div className="space-y-2">
-                  <label className="block text-xs mb-2" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>KANBAN BOARDS</label>
-                  <ExplorerTree<Board>
-                    items={kanbanBoards.map(board => ({ ...board, category: board.category || "Uncategorized" }))}
-                    groupKey="category"
-                    onCreate={handleAddToCategory}
-                    renderGroupHeader={renderCategoryHeader}
-                    renderItem={(board) => renderBoardItem(board, 'kanban-')}
-                  />
-                </div>
-              )}
+              {/* Active Boards Section */}
+              {!showArchived && (
+                <>
+                  {/* Favorites Section */}
+                  {favoriteBoards.length > 0 && (
+                    <div className="space-y-2">
+                      <label className="block text-xs mb-2" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>FAVORITES</label>
+                      {favoriteBoards.map(board => renderBoardItem(board, 'fav-'))}
+                    </div>
+                  )}
 
-              {/* Notes Boards */}
-              {notesBoards.length > 0 && (
-                <div className="space-y-2">
-                  <label className="block text-xs mb-2" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>NOTES</label>
-                  <ExplorerTree<Board>
-                    items={notesBoards.map(board => ({ ...board, category: board.category || "Uncategorized" }))}
-                    groupKey="category"
-                    onCreate={(category) => handleAddToCategory(category, "notes")}
-                    renderGroupHeader={renderCategoryHeader}
-                    renderItem={(board) => renderBoardItem(board, 'notes-')}
-                  />
-                </div>
-              )}
+                  {/* Kanban Boards */}
+                  {kanbanBoards.length > 0 && (
+                    <div className="space-y-2">
+                      <label className="block text-xs mb-2" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>KANBAN BOARDS</label>
+                      <ExplorerTree<Board>
+                        items={kanbanBoards.map(board => ({ ...board, category: board.category || "Uncategorized" }))}
+                        groupKey="category"
+                        onCreate={handleAddToCategory}
+                        renderGroupHeader={renderCategoryHeader}
+                        renderItem={(board) => renderBoardItem(board, 'kanban-')}
+                      />
+                    </div>
+                  )}
 
-              {boards.length === 0 && (
-                <div className="text-center py-8">
-                  <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>No boards yet</p>
-                  <p style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginTop: "0.25rem" }}>Create one to get started</p>
-                </div>
+                  {/* Notes Boards */}
+                  {notesBoards.length > 0 && (
+                    <div className="space-y-2">
+                      <label className="block text-xs mb-2" style={{ color: 'var(--text-muted)', fontWeight: 600 }}>NOTES</label>
+                      <ExplorerTree<Board>
+                        items={notesBoards.map(board => ({ ...board, category: board.category || "Uncategorized" }))}
+                        groupKey="category"
+                        onCreate={(category) => handleAddToCategory(category, "notes")}
+                        renderGroupHeader={renderCategoryHeader}
+                        renderItem={(board) => renderBoardItem(board, 'notes-')}
+                      />
+                    </div>
+                  )}
+
+                  {boards.length === 0 && (
+                    <div className="text-center py-8">
+                      <p style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>No boards yet</p>
+                      <p style={{ color: "var(--text-muted)", fontSize: "0.75rem", marginTop: "0.25rem" }}>Create one to get started</p>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

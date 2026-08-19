@@ -366,6 +366,8 @@ export default function CardGridView() {
   const setActiveTags = useKanbanStore(s => s.setActiveTags)
   const toggleTag     = useKanbanStore(s => s.toggleTag)
   const showArchived  = useKanbanStore(s => s.showArchived)
+  const archiveFilter = useKanbanStore(s => s.archiveFilter)
+  const setArchiveFilter = useKanbanStore(s => s.setArchiveFilter)
   const updateTask    = useKanbanStore(s => s.updateTask)
   const deleteTask    = useKanbanStore(s => s.deleteTask)
   const archiveTask   = useKanbanStore(s => s.archiveTask)
@@ -394,7 +396,8 @@ export default function CardGridView() {
   const filteredTasks = useMemo(() => {
     const eff = localSearch || searchQuery
     const result = tasks.filter(task => {
-      if (!showArchived && isArchived(task)) return false
+      if (archiveFilter === "archived" && !isArchived(task)) return false
+      if (archiveFilter === "active" && isArchived(task)) return false
       if (activeTags.length > 0 && !task.tags?.some(t => activeTags.includes(t))) return false
       if (filterPriority !== "all" && (task.priority ?? "low") !== filterPriority) return false
       if (filterType !== "all" && (task.type ?? "task") !== filterType) return false
@@ -420,7 +423,7 @@ export default function CardGridView() {
       }
       return sortDir === "asc" ? cmp : -cmp
     })
-  }, [tasks, activeTags, searchQuery, localSearch, showArchived, sortKey, sortDir, filterPriority, filterType, filterColumn, getColumnName])
+  }, [tasks, activeTags, searchQuery, localSearch, archiveFilter, sortKey, sortDir, filterPriority, filterType, filterColumn, getColumnName])
 
   // Selection
   const allSelected  = filteredTasks.length > 0 && filteredTasks.every(t => selectedIds.has(t.id))
@@ -653,7 +656,7 @@ export default function CardGridView() {
         onToggleTag={toggleTag}
         onClearTags={() => setActiveTags([])}
         taskCount={filteredTasks.length}
-        totalCount={tasks.filter(t => showArchived || !isArchived(t)).length}
+        totalCount={tasks.length}
       />
 
       {/* Bulk action bar */}

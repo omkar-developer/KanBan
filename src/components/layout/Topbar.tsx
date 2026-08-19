@@ -208,6 +208,8 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
 
   const setViewMode     = useKanbanStore(s => s.setViewMode)
   const setShowArchived = useKanbanStore(s => s.setShowArchived)
+  const archiveFilter = useKanbanStore(s => s.archiveFilter)
+  const setArchiveFilter = useKanbanStore(s => s.setArchiveFilter)
   const setSearchQuery  = useKanbanStore(s => s.setSearchQuery)
   const setActiveTags   = useKanbanStore(s => s.setActiveTags)
   const toggleTag       = useKanbanStore(s => s.toggleTag)
@@ -565,7 +567,7 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
         {(viewMode === "list" || viewMode === "grid") && (
           <>
             <Sep />
-            <ArchivedToggle active={showArchived} count={archivedCount} onClick={() => setShowArchived(!showArchived)} />
+            <ArchivedToggle active={archiveFilter === "archived"} count={archivedCount} onClick={() => setArchiveFilter(archiveFilter === "archived" ? "active" : "archived")} />
           </>
         )}
 
@@ -693,7 +695,7 @@ function ArchivedToggle({ active, count, onClick }: { active: boolean; count: nu
   return (
     <button
       onClick={onClick}
-      title={active ? "Hide archived tasks" : "Show archived tasks"}
+      title={active ? "Show archived tasks" : "Show archived tasks"}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
@@ -702,7 +704,7 @@ function ArchivedToggle({ active, count, onClick }: { active: boolean; count: nu
         transition: "background-color 0.15s, color 0.15s, border-color 0.15s",
         backgroundColor: active ? "rgba(113,113,122,0.18)" : hov ? "rgba(255,255,255,0.05)" : "transparent",
         color: active ? "var(--text-secondary)" : hov ? "var(--text-primary)" : "var(--text-muted)",
-        fontSize: 12, fontWeight: 500,
+        fontSize: 12, fontWeight: active ? 600 : 500,
         fontFamily: "'DM Sans', sans-serif",
         outline: active ? "1px solid rgba(113,113,122,0.3)" : "none",
         flexShrink: 0,

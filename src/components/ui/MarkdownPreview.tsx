@@ -444,8 +444,8 @@ export default function MarkdownPreview({ content, onWikiLinkClick }: MarkdownPr
           p: ({children})=><p style={{marginTop:0,marginBottom:14,color:"var(--text-primary)"}}>{children}</p>,
 
           // ── Links — Tauri-aware ─────────────────────────────────────────────
-          a: ({href,url,children})=>{
-            const linkUrl = href ?? url
+          a: ({href,children})=>{
+            const linkUrl = href
             if (linkUrl?.startsWith("wiki:")) {
               const title = decodeURIComponent(linkUrl.slice(5))
               return (

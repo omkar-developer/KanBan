@@ -11,7 +11,7 @@ import {
   Telescope, Headphones, FileJson2, HardDrive, Megaphone, Mic,
   Shield, ShoppingCart, Tv2, Umbrella, Video, Wallet, Wheat, Wifi,
   Wind, ZapOff, ZoomIn, ZoomOut, Atom, Binary, Cpu, Palette, PenLine,
-  Sprout, Triangle, Scan, GalleryVertical
+  Sprout, Triangle, Scan, GalleryVertical, Archive, ArchiveRestore
 } from "lucide-react"
 
 interface Props {
@@ -108,6 +108,8 @@ export default function BoardsPage({ onSelectBoard }: Props) {
   const createBoard = useKanbanStore(s => s.createBoard)
   const updateBoard = useKanbanStore(s => s.updateBoard)
   const deleteBoard = useKanbanStore(s => s.deleteBoard)
+  const archiveBoard = useKanbanStore(s => s.archiveBoard)
+  const unarchiveBoard = useKanbanStore(s => s.unarchiveBoard)
 
   const [name, setName] = useState("")
   const [boardType, setBoardType] = useState<"kanban" | "notes">("kanban")
@@ -115,6 +117,7 @@ export default function BoardsPage({ onSelectBoard }: Props) {
   const [selectedIcon, setSelectedIcon] = useState("circle")
   const [selectedColor, setSelectedColor] = useState("#3b82f6")
   const [iconTab, setIconTab] = useState<"icon" | "color">("icon")
+  const [showArchived, setShowArchived] = useState(false)
 
   const [editingBoard, setEditingBoard] = useState<Board | null>(null)
   const [deletingBoard, setDeletingBoard] = useState<Board | null>(null)
@@ -157,6 +160,9 @@ export default function BoardsPage({ onSelectBoard }: Props) {
     }
     return null
   }
+
+  const archivedCount = boards.filter(b => b.archived).length
+  const displayBoards = showArchived ? boards : boards.filter(b => !b.archived)
 
   return (
     <div className="min-h-screen bg-zinc-950 p-8">
@@ -284,7 +290,23 @@ export default function BoardsPage({ onSelectBoard }: Props) {
         </div>
 
         {/* Board List */}
-        {boards.length === 0 ? (
+        {displayBoards.length === 0 && boards.length > 0 && !showArchived ? (
+          <div className="text-center py-16">
+            <div className="inline-block p-4 rounded-full bg-zinc-900 mb-4">
+              <svg className="w-12 h-12 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </div>
+            <p className="text-white text-lg font-medium">No boards yet</p>
+            <p className="text-zinc-400 mt-1">Create your first board to get started</p>
+          </div>
+        ) : displayBoards.length === 0 && boards.length > 0 && showArchived ? (
+          <div className="text-center py-16">
+            <Archive className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
+            <p className="text-white text-lg font-medium">No archived boards</p>
+            <p className="text-zinc-400 mt-1">Archived boards will appear here</p>
+          </div>
+        ) : displayBoards.length === 0 ? (
           <div className="text-center py-16">
             <div className="inline-block p-4 rounded-full bg-zinc-900 mb-4">
               <svg className="w-12 h-12 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -295,14 +317,44 @@ export default function BoardsPage({ onSelectBoard }: Props) {
             <p className="text-zinc-400 mt-1">Create your first board to get started</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {boards.map((board) => {
+          <>
+            {/* Filter Bar */}
+            {boards.length > 0 && (
+              <div className="flex items-center justify-between mb-6">
+                <button
+                  onClick={() => setShowArchived(false)}
+                  className={`text-sm font-medium px-4 py-2 rounded-lg transition ${
+                    !showArchived ? "text-white bg-white/10" : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  Active Boards
+                </button>
+                <button
+                  onClick={() => setShowArchived(true)}
+                  className={`text-sm font-medium px-4 py-2 rounded-lg transition flex items-center gap-2 ${
+                    showArchived ? "text-white bg-white/10" : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  <Archive className="w-4 h-4" />
+                  Archived
+                  {archivedCount > 0 && (
+                    <span className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">{archivedCount}</span>
+                  )}
+                </button>
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {displayBoards.map((board) => {
               const isMenuOpen = menuOpen === board.id
               
               return (
                 <div
                   key={board.id}
-                  className="group relative bg-zinc-900 rounded-xl border border-zinc-800 p-6 hover:border-blue-600 hover:shadow-xl transition-all hover:bg-zinc-800"
+                  className={`group relative rounded-xl border p-6 transition-all ${
+                    board.archived
+                      ? "bg-zinc-900/60 border-zinc-800 opacity-60 hover:opacity-80"
+                      : "bg-zinc-900 border-zinc-800 hover:border-blue-600 hover:shadow-xl hover:bg-zinc-800"
+                  }`}
                 >
                   {/* Board Card - Click to open */}
                   <div
@@ -391,6 +443,31 @@ export default function BoardsPage({ onSelectBoard }: Props) {
                             </svg>
                             Edit
                           </button>
+                          {board.archived ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                unarchiveBoard(board.id)
+                                setMenuOpen(null)
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-white/[0.08] transition-colors flex items-center gap-2"
+                            >
+                              <ArchiveRestore className="w-4 h-4" />
+                              Unarchive
+                            </button>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                archiveBoard(board.id)
+                                setMenuOpen(null)
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-white/[0.08] transition-colors flex items-center gap-2"
+                            >
+                              <Archive className="w-4 h-4" />
+                              Archive
+                            </button>
+                          )}
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
@@ -411,7 +488,8 @@ export default function BoardsPage({ onSelectBoard }: Props) {
                 </div>
               )
             })}
-          </div>
+              </div>
+            </>
         )}
       </div>
 
