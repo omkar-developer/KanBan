@@ -74,7 +74,7 @@ export default function NotesView() {
   const autosaveTimer  = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Derived data ───────────────────────────────────────────────────────────
-  const allNoteTasks = useMemo(() => tasks.filter(t => t.type === "note"), [tasks])
+  const allNoteTasks = useMemo(() => tasks.filter(t => t.type === "note" || (t.data as any)?.category), [tasks])
 
   const noteTasks = useMemo(() => {
     let result = allNoteTasks
@@ -109,7 +109,7 @@ export default function NotesView() {
     [noteTasks, categories]
   )
 
-  const selectedNote = useMemo(() => noteTasks.find(t => t.id === selectedNoteId), [noteTasks, selectedNoteId])
+  const selectedNote = useMemo(() => tasks.find(t => t.id === selectedNoteId), [tasks, selectedNoteId])
 
   // ── Sync content when note changes ────────────────────────────────────────
   useEffect(() => {
@@ -350,12 +350,12 @@ export default function NotesView() {
   }, [selectedNote, noteContent, noteTags, pdfShowHeader, pdfShowTags, pdfShowWordCount])
 
   const handleWikiLinkClick = useCallback((title: string) => {
-    const found = allNoteTasks.find(t => t.title.toLowerCase() === title.toLowerCase())
+    const found = tasks.find(t => t.title.toLowerCase() === title.toLowerCase())
     if (found) {
       setSelectedNoteId(found.id)
       setViewMode("preview")
     }
-  }, [allNoteTasks])
+  }, [tasks])
 
   const handleDeleteNote = async () => { setShowDeleteDialog(true) }
 

@@ -368,6 +368,16 @@ function processContent(text: string): string {
     .replace(/\[\[([^\]]+)\]\]/g, (_m, title) => `[${title}](wiki:${encodeURIComponent(title)})`)
 }
 
+// Custom URL transform that preserves wiki: URLs
+function urlTransform(url: string, key: string): string {
+  if (key === "href" && url.startsWith("wiki:")) {
+    // Decode the title that was already encodeURIComponent'd, then re-encode only unsafe chars
+    // but preserve the colon. The sanitize-uri library would encode ":" → "%3A"
+    return url
+  }
+  return url
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Static plugin arrays — outside component so references never change
 // ─────────────────────────────────────────────────────────────────────────────
@@ -407,6 +417,7 @@ export default function MarkdownPreview({ content, onWikiLinkClick }: MarkdownPr
       <ReactMarkdown
         remarkPlugins={REMARK_PLUGINS}
         rehypePlugins={REHYPE_PLUGINS}
+        urlTransform={urlTransform}
         components={{
 
           h1: ({children,id})=>(
@@ -433,25 +444,34 @@ export default function MarkdownPreview({ content, onWikiLinkClick }: MarkdownPr
           p: ({children})=><p style={{marginTop:0,marginBottom:14,color:"var(--text-primary)"}}>{children}</p>,
 
           // ── Links — Tauri-aware ─────────────────────────────────────────────
-          a: ({href,children})=>{
-            if (href?.startsWith("wiki:")) {
-              const title = decodeURIComponent(href.slice(5))
+          a: ({href,url,children})=>{
+            const linkUrl = href ?? url
+            if (linkUrl?.startsWith("wiki:")) {
+              const title = decodeURIComponent(linkUrl.slice(5))
               return (
-                <button onClick={()=>onWikiLinkClick?.(title)} style={{color:"var(--accent,#60a5fa)",textDecoration:"underline",textDecorationStyle:"dotted",background:"none",border:"none",cursor:"pointer",padding:0,font:"inherit"}}>
+                <button onClick={()=>{
+                  onWikiLinkClick?.(title)
+                }} style={{color:"var(--accent,#60a5fa)",textDecoration:"none",background:"none",border:"1px solid var(--border)",cursor:"pointer",padding:"0 4px",borderRadius:3,font:"inherit",display:"inline-flex",alignItems:"center",gap:3,margin:"-1px 0",transition:"background-color 0.15s",boxShadow:"0 1px 2px rgba(0,0,0,0.05)"}}
+                  onMouseEnter={e=>{ e.currentTarget.style.backgroundColor="rgba(96,165,250,0.1)" }}
+                  onMouseLeave={e=>{ e.currentTarget.style.backgroundColor="transparent" }}
+                >
+                  <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{opacity:0.5}}>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
                   {children}
                 </button>
               )
             }
             // Anchor links (#id) are fine as regular hrefs
-            if (href?.startsWith("#")) {
-              return <a href={href} style={{color:"var(--accent,#60a5fa)",textDecoration:"underline"}}>{children}</a>
+            if (linkUrl?.startsWith("#")) {
+              return <a href={linkUrl} style={{color:"var(--accent,#60a5fa)",textDecoration:"underline"}}>{children}</a>
             }
             // External links — use Tauri shell when available
             return (
               <a
-                href={href}
+                href={linkUrl}
                 style={{color:"var(--accent,#60a5fa)",textDecoration:"underline",cursor:"pointer"}}
-                onClick={e=>{ e.preventDefault(); if(href) openExternal(href) }}
+                onClick={e=>{ e.preventDefault(); if(linkUrl) openExternal(linkUrl) }}
               >
                 {children}
               </a>

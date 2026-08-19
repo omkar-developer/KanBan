@@ -508,10 +508,11 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
           flexShrink: 0,
           zIndex: 40,
           position: "relative",
+          userSelect: "none",
         }}
       >
         {/* ── Board name + task count ─────────────────────────────────── */}
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexShrink: 0, userSelect: "none" }}>
           <h1
             style={{
               fontSize: 15,

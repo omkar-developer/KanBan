@@ -227,6 +227,7 @@ export default function BoardView({ boardId }: Props) {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              userSelect: "none",
               gap: 8,
               marginLeft: 8,
               transition: "border-color 0.15s, color 0.15s, background-color 0.15s",

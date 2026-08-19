@@ -12,7 +12,10 @@ import {
   Bug, Wrench, ClipboardList, LayoutList, Inbox, Pencil, FileText,
   Code2, GitBranch, Database, Server, Cloud, Link, Clock, Calendar,
   CheckCircle, BookOpen, Target, Pin, Sparkles, Coffee, Layers, Hammer,
-  Tag
+  Tag, Telescope, Headphones, FileJson2, HardDrive, Megaphone, Mic,
+  Shield, ShoppingCart, Tv2, Umbrella, Video, Wallet, Wheat, Wifi,
+  Wind, ZapOff, ZoomIn, ZoomOut, Atom, Binary, Cpu, Palette, PenLine,
+  Sprout, Triangle, Scan, GalleryVertical
 } from "lucide-react"
 
 interface SidebarProps {
@@ -51,6 +54,34 @@ const ICON_OPTIONS = [
   { id: "coffee", icon: Coffee },
   { id: "layers", icon: Layers },
   { id: "hammer", icon: Hammer },
+  { id: "tag", icon: Tag },
+  { id: "telescope", icon: Telescope },
+  { id: "headphones", icon: Headphones },
+  { id: "file-json", icon: FileJson2 },
+  { id: "hard-drive", icon: HardDrive },
+  { id: "megaphone", icon: Megaphone },
+  { id: "mic", icon: Mic },
+  { id: "shield", icon: Shield },
+  { id: "shopping-cart", icon: ShoppingCart },
+  { id: "tv", icon: Tv2 },
+  { id: "umbrella", icon: Umbrella },
+  { id: "video", icon: Video },
+  { id: "wallet", icon: Wallet },
+  { id: "wheat", icon: Wheat },
+  { id: "wifi", icon: Wifi },
+  { id: "wind", icon: Wind },
+  { id: "zap-off", icon: ZapOff },
+  { id: "zoom-in", icon: ZoomIn },
+  { id: "zoom-out", icon: ZoomOut },
+  { id: "atom", icon: Atom },
+  { id: "binary", icon: Binary },
+  { id: "cpu", icon: Cpu },
+  { id: "palette", icon: Palette },
+  { id: "pen-line", icon: PenLine },
+  { id: "sprout", icon: Sprout },
+  { id: "triangle", icon: Triangle },
+  { id: "scan", icon: Scan },
+  { id: "gallery", icon: GalleryVertical },
 ]
 
 const COLOR_OPTIONS = [
@@ -66,6 +97,14 @@ const COLOR_OPTIONS = [
   { label: "Red", value: "#ef4444" },
   { label: "Violet", value: "#a78bfa" },
   { label: "Pink", value: "#f472b6" },
+  { label: "Teal", value: "#2dd4bf" },
+  { label: "Cyan", value: "#22d3ee" },
+  { label: "Indigo", value: "#6366f1" },
+  { label: "Fuchsia", value: "#e879f9" },
+  { label: "Lime", value: "#84cc16" },
+  { label: "Stone", value: "#78716c" },
+  { label: "Warm Gray", value: "#78716c" },
+  { label: "Copper", value: "#b45309" },
 ]
 
 export default function Sidebar({ onSelectBoard }: SidebarProps) {
@@ -525,13 +564,14 @@ export default function Sidebar({ onSelectBoard }: SidebarProps) {
 
   return (
     <>
-      <div 
+        <div 
         className="flex flex-col h-full border-r transition-all duration-300"
         style={{
           backgroundColor: 'var(--bg-app)',
           borderRightColor: 'var(--border)',
           width: isCollapsed ? '64px' : '256px',
           overflow: 'hidden',
+          userSelect: "none",
         }}
       >
         {/* Header */}
