@@ -120,7 +120,7 @@ export default function NotesView() {
     } else {
       setNoteContent(""); setNoteTags([])
     }
-  }, [selectedNote?.id]) // eslint-disable-line
+  }, [selectedNote]) // re-run when selectedNote object changes (new reference after reload)
 
   // ── Word count update ──────────────────────────────────────────────────────
   useEffect(() => { setWordCountInfo(wordCount(noteContent)) }, [noteContent])

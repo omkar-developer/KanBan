@@ -116,6 +116,25 @@ function IconClose() {
     </svg>
   )
 }
+function IconRefresh({ spinning }: { spinning?: boolean }) {
+  return (
+    <svg
+      className={`w-4 h-4 ${spinning ? "animate-spin" : ""}`}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 16 16"
+      style={{ transition: "transform 0.3s" }}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.5}
+        d="M14.5 8A6.5 6.5 0 1 1 8 1.5"
+      />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.5 2.5V6H11" />
+    </svg>
+  )
+}
 
 // ── View mode config ──────────────────────────────────────────────────────────
 function IconNotes() {
@@ -196,6 +215,7 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
   const [importExportMenuOpen,  setImportExportMenuOpen]  = useState(false)
   const [showRestoreDialog,     setShowRestoreDialog]     = useState(false)
   const [pendingBackupData,     setPendingBackupData]     = useState<DatabaseBackup | null>(null)
+  const [refreshing,            setRefreshing]            = useState(false)
 
   const openHelp = useUIStore(s => s.openHelp)
 
@@ -221,6 +241,17 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
   const allTags       = [...new Set(tasks.flatMap(t => t.tags || []))].filter(Boolean)
   const importExportMenuRef = useRef<HTMLButtonElement>(null)
   const searchInputRef      = useRef<HTMLInputElement>(null)
+
+  const handleRefresh = async () => {
+    if (refreshing || !boardId) return
+    setRefreshing(true)
+    try {
+      await loadBoards()
+      await loadBoard(boardId)
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   // Focus search when the global shortcuts hook requests it (⌘/Ctrl+F)
   useEffect(() => {
@@ -591,6 +622,11 @@ export default function TopBar({ boardName = "Kanban", boardId, onSettingsClick 
         />
 
         <Sep />
+
+        {/* ── Refresh ──────────────────────────────────────────────── */}
+        <IconBtn onClick={handleRefresh} title="Reload board" active={refreshing}>
+          <IconRefresh spinning={refreshing} />
+        </IconBtn>
 
         {/* ── Help ─────────────────────────────────────────────────── */}
         <IconBtn onClick={openHelp} title="Help & Keyboard Shortcuts">

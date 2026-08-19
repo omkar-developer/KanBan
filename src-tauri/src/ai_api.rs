@@ -20,7 +20,7 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use rusqlite::{Connection, OptionalExtension};
 use serde_json::{json, Value};
-use tauri::{AppHandle, Manager, State as TauriState};
+use tauri::{AppHandle, Emitter, Manager, State as TauriState};
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -29,6 +29,7 @@ pub struct AppState {
     pub config_dir: PathBuf,
     pub token: Mutex<String>,
     pub port: Mutex<u16>,
+    pub app_handle: AppHandle,
 }
 
 // ── Token persistence ─────────────────────────────────────────────────────────
@@ -67,6 +68,14 @@ fn write_info_file(state: &AppState) {
         serde_json::to_string_pretty(&info).unwrap(),
     ) {
         log::error!("[AI API] Failed to write ai-api.json: {e}");
+    }
+}
+
+/// Emit a data-changed event to the frontend with the affected board ID.
+fn emit_data_changed(state: &AppState, board_id: &str) {
+    let payload = json!({ "boardId": board_id });
+    if let Err(e) = state.app_handle.emit("data-changed", payload) {
+        log::warn!("[AI API] Failed to emit data-changed event: {e}");
     }
 }
 
@@ -120,6 +129,7 @@ pub fn start(app: &AppHandle) {
         config_dir,
         token: Mutex::new(token),
         port: Mutex::new(0),
+        app_handle: app.clone(),
     });
 
     app.manage(state.clone());
@@ -442,6 +452,7 @@ async fn create_board(
         }
     }
 
+    emit_data_changed(&state, &id);
     Ok(Json(json!({ "id": id, "name": name, "columns": column_ids })))
 }
 
@@ -454,6 +465,7 @@ async fn delete_board(
     if n == 0 {
         return Err(ApiError::NotFound("board".into()));
     }
+    emit_data_changed(&state, &id);
     Ok(Json(json!({ "deleted": id })))
 }
 
@@ -511,6 +523,7 @@ async fn create_column(
     )
     .map_err(ApiError::Db)?;
 
+    emit_data_changed(&state, &board_id);
     Ok(Json(json!({ "id": id, "boardId": board_id, "name": name, "order": order })))
 }
 
@@ -519,10 +532,14 @@ async fn delete_column(
     Path(column_id): Path<String>,
 ) -> Result<Json<Value>, ApiError> {
     let conn = open_conn(&state)?;
+    let board_id: String = conn
+        .query_row("SELECT boardId FROM columns WHERE id = ?1", [&column_id], |r| r.get(0))
+        .map_err(|_| ApiError::NotFound("column".into()))?;
     let n = conn.execute("DELETE FROM columns WHERE id = ?1", [&column_id]).map_err(ApiError::Db)?;
     if n == 0 {
         return Err(ApiError::NotFound("column".into()));
     }
+    emit_data_changed(&state, &board_id);
     Ok(Json(json!({ "deleted": column_id })))
 }
 
@@ -591,6 +608,10 @@ async fn create_task(
     )
     .map_err(ApiError::Db)?;
 
+    let board_id: String = conn
+        .query_row("SELECT boardId FROM columns WHERE id = ?1", [&column_id], |r| r.get(0))
+        .map_err(|_| ApiError::NotFound("column".into()))?;
+    emit_data_changed(&state, &board_id);
     Ok(Json(json!({ "id": id, "columnId": column_id, "title": title, "order": order })))
 }
 
@@ -649,23 +670,55 @@ async fn update_task(
             _ => {}
         }
     }
-    if let Some(v) = body.get("category") {
-        match v {
-            Value::String(s) => data_obj["category"] = json!(s),
-            Value::Null => json_remove(&mut data_obj, "category"),
-            _ => {}
+    // If category is being changed and this is a note (or has category), 
+    // find/create the matching column in the same board and move the task there
+    let mut column_id = body.get("columnId").and_then(|v| v.as_str()).unwrap_or(&current_column).to_string();
+    let new_category = body.get("category").and_then(|v| v.as_str());
+    if new_category.is_some() {
+        // Get the board ID from current column
+        let board_id: String = conn
+            .query_row("SELECT boardId FROM columns WHERE id = ?1", [&current_column], |r| r.get(0))
+            .map_err(|_| ApiError::NotFound("column".into()))?;
+        
+        let col_name = new_category.filter(|c| !c.trim().is_empty()).unwrap_or("Notes");
+        
+        // Update data_obj with the new category (this will be stored in data JSON)
+        match new_category {
+            Some(s) if !s.trim().is_empty() => data_obj["category"] = json!(s),
+            _ => json_remove(&mut data_obj, "category"),
         }
-    }
-    if let Some(v) = body.get("data") {
-        if let Value::Object(m) = v {
-            for (k, val) in m {
-                data_obj[k.clone()] = val.clone();
+        
+        // Find or create column with the category name
+        let existing: Option<String> = conn
+            .query_row(
+                "SELECT id FROM columns WHERE boardId = ?1 AND name = ?2",
+                rusqlite::params![board_id, col_name],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(ApiError::Db)?;
+        
+        column_id = match existing {
+            Some(cid) => cid,
+            None => {
+                let cid = uuid::Uuid::new_v4().to_string();
+                let order: i64 = conn
+                    .query_row(
+                        "SELECT COALESCE(MAX(\"order\"), 0) + 1 FROM columns WHERE boardId = ?1",
+                        [&board_id],
+                        |r| r.get(0),
+                    )
+                    .map_err(ApiError::Db)?;
+                conn.execute(
+                    "INSERT INTO columns (id, boardId, name, \"order\", data) VALUES (?1, ?2, ?3, ?4, ?5)",
+                    rusqlite::params![cid, board_id, col_name, order, None::<String>],
+                )
+                .map_err(ApiError::Db)?;
+                cid
             }
-        }
+        };
     }
-
     let title = body.get("title").and_then(|v| v.as_str()).unwrap_or(&current_title);
-    let column_id = body.get("columnId").and_then(|v| v.as_str()).unwrap_or(&current_column);
     let order = body.get("order").and_then(|v| v.as_i64()).unwrap_or(current_order);
     let tags = match body.get("tags") {
         Some(Value::Array(a)) => Some(serde_json::to_string(a).unwrap_or_else(|_| "[]".into())),
@@ -685,6 +738,10 @@ async fn update_task(
     )
     .map_err(ApiError::Db)?;
 
+    let board_id: String = conn
+        .query_row("SELECT boardId FROM columns WHERE id = ?1", [&column_id], |r| r.get(0))
+        .map_err(|_| ApiError::NotFound("column".into()))?;
+    emit_data_changed(&state, &board_id);
     Ok(Json(json!({ "id": id, "updated": true })))
 }
 
@@ -693,10 +750,17 @@ async fn delete_task(
     Path(id): Path<String>,
 ) -> Result<Json<Value>, ApiError> {
     let conn = open_conn(&state)?;
+    let column_id: String = conn
+        .query_row("SELECT columnId FROM tasks WHERE id = ?1", [&id], |r| r.get(0))
+        .map_err(|_| ApiError::NotFound("task".into()))?;
+    let board_id: String = conn
+        .query_row("SELECT boardId FROM columns WHERE id = ?1", [&column_id], |r| r.get(0))
+        .map_err(|_| ApiError::NotFound("column".into()))?;
     let n = conn.execute("DELETE FROM tasks WHERE id = ?1", [&id]).map_err(ApiError::Db)?;
     if n == 0 {
         return Err(ApiError::NotFound("task".into()));
     }
+    emit_data_changed(&state, &board_id);
     Ok(Json(json!({ "deleted": id })))
 }
 
@@ -841,6 +905,7 @@ async fn create_note(
     )
     .map_err(ApiError::Db)?;
 
+    emit_data_changed(&state, &board_id);
     Ok(Json(json!({ "id": id, "boardId": board_id, "category": col_name, "title": title })))
 }
 
