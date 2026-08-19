@@ -350,9 +350,12 @@ export default function NotesView() {
   }, [selectedNote, noteContent, noteTags, pdfShowHeader, pdfShowTags, pdfShowWordCount])
 
   const handleWikiLinkClick = useCallback((title: string) => {
-    const found = noteTasks.find(t => t.title.toLowerCase() === title.toLowerCase())
-    if (found) setSelectedNoteId(found.id)
-  }, [noteTasks])
+    const found = allNoteTasks.find(t => t.title.toLowerCase() === title.toLowerCase())
+    if (found) {
+      setSelectedNoteId(found.id)
+      setViewMode("preview")
+    }
+  }, [allNoteTasks])
 
   const handleDeleteNote = async () => { setShowDeleteDialog(true) }
 
