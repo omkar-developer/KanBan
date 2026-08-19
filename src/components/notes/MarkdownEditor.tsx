@@ -60,6 +60,10 @@ export default function MarkdownEditor({
     );
   }, [onWikiLinkClick]);
 
+  const wikiProcessedValue = useCallback(() => {
+    return (value || "").replace(/\[\[([^\]]+)\]\]/g, '[$1](wiki:$1)')
+  }, [value])
+
   // Handle toolbar button clicks
   const applyToolbar = useCallback((item: typeof toolbarItems[0]) => {
     const el = textareaRef.current;
@@ -174,8 +178,23 @@ export default function MarkdownEditor({
       {/* Editor or Preview */}
       {previewMode ? (
         <div className="markdown-preview">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {value || "*Nothing yet…*"}
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+            a: ({href, children}) => {
+              if (href?.startsWith("wiki:")) {
+                return (
+                  <button
+                    type="button"
+                    onClick={() => onWikiLinkClick?.(href.slice(5))}
+                    className="wiki-link"
+                  >
+                    {children}
+                  </button>
+                )
+              }
+              return <a href={href}>{children}</a>
+            }
+          }}>
+            {wikiProcessedValue()}
           </ReactMarkdown>
         </div>
       ) : (
