@@ -79,7 +79,7 @@ export default function FilePreviewDialog({ filePath, onClose }: Props) {
         title,
         description: body,
         type: "note",
-        data: JSON.stringify({ category: fm.category || "Imported", filePath }),
+        data: { category: fm.category || "Imported", filePath },
         order: 1000,
         createdAt: Date.now(),
       } as Task)
