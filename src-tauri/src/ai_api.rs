@@ -303,6 +303,32 @@ fn json_remove(obj: &mut Value, key: &str) {
     }
 }
 
+/// Set the note category in BOTH the top-level data JSON (API canonical) and the
+/// nested `data.category` object that the frontend (NotesView) actually reads, so
+/// API-driven category changes show up in the UI. Passing None removes both.
+fn set_data_category(data_obj: &mut Value, category: Option<&str>) {
+    match category {
+        Some(s) if !s.trim().is_empty() => {
+            data_obj["category"] = json!(s);
+            match data_obj.get_mut("data") {
+                Some(Value::Object(m)) => {
+                    m.insert("category".to_string(), json!(s));
+                }
+                Some(_) => {} // non-object `data` — leave it alone
+                None => {
+                    data_obj["data"] = json!({ "category": s });
+                }
+            }
+        }
+        _ => {
+            json_remove(data_obj, "category");
+            if let Some(Value::Object(m)) = data_obj.get_mut("data") {
+                m.remove("category");
+            }
+        }
+    }
+}
+
 // ── Auth middleware ──────────────────────────────────────────────────────────
 
 async fn auth(
@@ -683,10 +709,7 @@ async fn update_task(
         let col_name = new_category.filter(|c| !c.trim().is_empty()).unwrap_or("Notes");
         
         // Update data_obj with the new category (this will be stored in data JSON)
-        match new_category {
-            Some(s) if !s.trim().is_empty() => data_obj["category"] = json!(s),
-            _ => json_remove(&mut data_obj, "category"),
-        }
+        set_data_category(&mut data_obj, new_category);
         
         // Find or create column with the category name
         let existing: Option<String> = conn
@@ -885,7 +908,7 @@ async fn create_note(
     let now = chrono_now_ms();
 
     let mut data_obj = json!({ "type": "note" });
-    data_obj["category"] = json!(col_name);
+    set_data_category(&mut data_obj, Some(&col_name));
     if let Some(c) = body["content"].as_str() {
         data_obj["description"] = json!(c);
     }

@@ -26,6 +26,7 @@ tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
+tauri-plugin-shell = "2"
 axum = "0.8"
 tokio = { version = "1", features = ["full"] }
 rusqlite = { version = "0.32", features = ["bundled"] }

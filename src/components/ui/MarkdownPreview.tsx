@@ -32,7 +32,7 @@
  * CSS: @import "katex/dist/katex.min.css";
  */
 
-import { useMemo, useState, useEffect, useCallback } from "react"
+import { useMemo, useState, useEffect, useCallback, Children, isValidElement } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
@@ -329,6 +329,73 @@ function LatexBlock({ code }: { code: string }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// LocalImage — renders images stored in the app config dir (from pasted images).
+// Reads the file via the Tauri fs plugin and serves it as a data URL so no
+// server or custom protocol is required.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function extToMime(ext: string): string {
+  switch (ext.toLowerCase()) {
+    case "png":  return "image/png"
+    case "jpg":
+    case "jpeg": return "image/jpeg"
+    case "gif":  return "image/gif"
+    case "webp": return "image/webp"
+    case "svg":  return "image/svg+xml"
+    case "bmp":  return "image/bmp"
+    case "ico":  return "image/x-icon"
+    default:     return "image/png"
+  }
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ""
+  const chunk = 0x8000
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+  }
+  return btoa(binary)
+}
+
+function LocalImage({ src, alt, title }: { src: string; alt?: string; title?: string }) {
+  const [dataUrl, setDataUrl] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let cancel = false
+    ;(async () => {
+      try {
+        const path = src.slice("local:".length)
+        const fs = await import("@tauri-apps/plugin-fs")
+        const { BaseDirectory } = await import("@tauri-apps/api/path")
+        const bytes = await fs.readFile(path, { baseDir: BaseDirectory.AppConfig })
+        if (cancel) return
+        const ext = path.split(".").pop() || "png"
+        setDataUrl(`data:${extToMime(ext)};base64,${bytesToBase64(bytes)}`)
+      } catch {
+        if (!cancel) setFailed(true)
+      }
+    })()
+    return () => { cancel = true }
+  }, [src])
+
+  if (failed) return (
+    <div style={{ margin: "12px 0", border: "1px dashed var(--border)", borderRadius: 8, padding: 14, textAlign: "center", color: "var(--text-muted)", fontSize: 12 }}>
+      Couldn't load local image ({src})
+    </div>
+  )
+  if (!dataUrl) return (
+    <div style={{ margin: "12px 0", padding: 12, textAlign: "center", color: "var(--text-muted)", fontSize: 12 }}>Loading image…</div>
+  )
+  return (
+    <figure style={{ margin: "12px 0", padding: 0 }}>
+      <img src={dataUrl} alt={alt} loading="lazy" style={{ maxWidth: "100%", borderRadius: 8, border: "1px solid var(--border)", display: "block" }} />
+      {title && <figcaption style={{ marginTop: 6, fontSize: 12, color: "var(--text-muted)", textAlign: "center", fontStyle: "italic" }}>{title}</figcaption>}
+    </figure>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // HeadingAnchor
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -347,13 +414,21 @@ function HeadingAnchor({ id, children }: { id?:string; children:React.ReactNode 
 // Tauri-aware link opener
 // ─────────────────────────────────────────────────────────────────────────────
 
+function normalizeUrl(url: string): string {
+  const trimmed = url.trim()
+  // Has a scheme already (http:, https:, mailto:, tel:, ftp:, …)
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed
+  return `https://${trimmed}`
+}
+
 async function openExternal(url: string): Promise<void> {
+  const target = normalizeUrl(url)
   try {
     const { open } = await import("@tauri-apps/plugin-shell")
-    await open(url)
+    await open(target)
   } catch {
     // Dev mode / browser fallback
-    window.open(url, "_blank", "noopener,noreferrer")
+    window.open(target, "_blank", "noopener,noreferrer")
   }
 }
 
@@ -444,7 +519,7 @@ export default function MarkdownPreview({ content, onWikiLinkClick }: MarkdownPr
           p: ({children})=><p style={{marginTop:0,marginBottom:14,color:"var(--text-primary)"}}>{children}</p>,
 
           // ── Links — Tauri-aware ─────────────────────────────────────────────
-          a: ({href,children})=>{
+          a: ({href,children,...props})=>{
             const linkUrl = href
             if (linkUrl?.startsWith("wiki:")) {
               const title = decodeURIComponent(linkUrl.slice(5))
@@ -464,12 +539,12 @@ export default function MarkdownPreview({ content, onWikiLinkClick }: MarkdownPr
             }
             // Anchor links (#id) are fine as regular hrefs
             if (linkUrl?.startsWith("#")) {
-              return <a href={linkUrl} style={{color:"var(--accent,#60a5fa)",textDecoration:"underline"}}>{children}</a>
+              return <a href={linkUrl} id={(props as Record<string,unknown>).id as string|undefined} style={{color:"var(--accent,#60a5fa)",textDecoration:"underline"}}>{children}</a>
             }
             // External links — use Tauri shell when available
             return (
               <a
-                href={linkUrl}
+                href={linkUrl ? normalizeUrl(linkUrl) : undefined}
                 style={{color:"var(--accent,#60a5fa)",textDecoration:"underline",cursor:"pointer"}}
                 onClick={e=>{ e.preventDefault(); if(linkUrl) openExternal(linkUrl) }}
               >
@@ -482,7 +557,8 @@ export default function MarkdownPreview({ content, onWikiLinkClick }: MarkdownPr
           ol: ({children})=><ol style={{paddingLeft:20,marginBottom:14,listStyleType:"decimal"}}>{children}</ol>,
           li: ({children,...props})=>{
             const isTask=(props as Record<string,unknown>).className==="task-list-item"
-            return <li style={{marginBottom:4,color:"var(--text-primary)",listStyleType:isTask?"none":undefined,marginLeft:isTask?-4:undefined}}>{children}</li>
+            const id=(props as Record<string,unknown>).id as string|undefined
+            return <li id={id} style={{marginBottom:4,color:"var(--text-primary)",listStyleType:isTask?"none":undefined,marginLeft:isTask?-4:undefined}}>{children}</li>
           },
           input: ({type,checked}:{type?:string;checked?:boolean})=>{
             if(type==="checkbox") return <input type="checkbox" checked={checked} readOnly style={{marginRight:6,accentColor:"var(--accent,#60a5fa)",cursor:"default"}}/>
@@ -527,12 +603,17 @@ export default function MarkdownPreview({ content, onWikiLinkClick }: MarkdownPr
           em:     ({children})=><em style={{fontStyle:"italic",color:"var(--text-secondary)"}}>{children}</em>,
           del:    ({children})=><del style={{textDecoration:"line-through",color:mutedColor}}>{children}</del>,
 
-          img: ({src,alt,title})=>(
-            <figure style={{margin:"12px 0",padding:0}}>
-              <img src={src} alt={alt} loading="lazy" style={{maxWidth:"100%",borderRadius:8,border:"1px solid var(--border)",display:"block"}}/>
-              {title&&<figcaption style={{marginTop:6,fontSize:12,color:mutedColor,textAlign:"center",fontStyle:"italic"}}>{title}</figcaption>}
-            </figure>
-          ),
+          img: ({src,alt,title})=>{
+            if (src?.startsWith("local:")) {
+              return <LocalImage src={src} alt={alt} title={title} />
+            }
+            return (
+              <figure style={{margin:"12px 0",padding:0}}>
+                <img src={src} alt={alt} loading="lazy" style={{maxWidth:"100%",borderRadius:8,border:"1px solid var(--border)",display:"block"}}/>
+                {title&&<figcaption style={{marginTop:6,fontSize:12,color:mutedColor,textAlign:"center",fontStyle:"italic"}}>{title}</figcaption>}
+              </figure>
+            )
+          },
 
           details: ({children,...props})=>(
             <details {...props as React.HTMLAttributes<HTMLElement>} style={{border:"1px solid var(--border)",borderRadius:8,padding:"8px 14px",marginBottom:14,backgroundColor:detailsBg}}>
@@ -547,12 +628,17 @@ export default function MarkdownPreview({ content, onWikiLinkClick }: MarkdownPr
 
           section: ({children,...props})=>{
             const cls=(props as Record<string,unknown>).className as string|undefined
-            if(cls?.includes("footnotes")) return (
-              <section style={{marginTop:40,paddingTop:16,borderTop:"1px solid var(--border)",fontSize:13,color:"var(--text-secondary)"}}>
-                <p style={{fontWeight:600,fontSize:11,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8,color:mutedColor}}>Footnotes</p>
-                {children}
-              </section>
-            )
+            if(cls?.includes("footnotes")) {
+              const body = Children.toArray(children).filter(
+                (c) => !(isValidElement(c) && c.type === "h2")
+              )
+              return (
+                <section style={{marginTop:40,paddingTop:16,borderTop:"1px solid var(--border)",fontSize:13,color:"var(--text-secondary)"}}>
+                  <p style={{fontWeight:600,fontSize:11,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:8,color:mutedColor}}>Footnotes</p>
+                  {body}
+                </section>
+              )
+            }
             return <section {...props as React.HTMLAttributes<HTMLElement>}>{children}</section>
           },
         }}

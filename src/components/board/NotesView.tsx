@@ -74,7 +74,12 @@ export default function NotesView() {
   const autosaveTimer  = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Derived data ───────────────────────────────────────────────────────────
-  const allNoteTasks = useMemo(() => tasks.filter(t => t.type === "note" || (t.data as any)?.category), [tasks])
+  // Category may live in data.category (frontend canonical) OR as a top-level
+  // `category` field (older/API-created notes). Read both for robustness.
+  const categoryOf = (t: Task): string =>
+    ((t.data?.category as string) || (t as { category?: string }).category || "").trim()
+
+  const allNoteTasks = useMemo(() => tasks.filter(t => t.type === "note" || !!categoryOf(t)), [tasks])
 
   const noteTasks = useMemo(() => {
     let result = allNoteTasks
@@ -91,10 +96,10 @@ export default function NotesView() {
   const categories = useMemo(() => {
     const set = new Set<string>()
     noteTasks.forEach(t => {
-      const cat = t.data?.category as string
+      const cat = categoryOf(t)
       if (cat?.trim()) set.add(cat)
     })
-    if (noteTasks.some(t => !t.data?.category)) set.add("Uncategorized")
+    if (noteTasks.some(t => !categoryOf(t))) set.add("Uncategorized")
     return Array.from(set).sort()
   }, [noteTasks])
 
@@ -102,7 +107,7 @@ export default function NotesView() {
     categories.map(cat => ({
       key: cat, label: cat,
       items: noteTasks.filter(t => {
-        const tc = t.data?.category as string
+        const tc = categoryOf(t)
         return cat === "Uncategorized" ? !tc : tc === cat
       }),
     })),
@@ -231,7 +236,7 @@ export default function NotesView() {
 
       const wordCount = noteContent.trim().split(/\s+/).filter(Boolean).length
       const metaParts = [
-        selectedNote.data?.category ? `<span>📁 ${selectedNote.data.category}</span>` : '',
+        selectedNote.data?.category || (selectedNote as { category?: string }).category ? `<span>📁 ${selectedNote.data?.category || (selectedNote as { category?: string }).category}</span>` : '',
         `<span>🗓 ${new Date(selectedNote.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>`,
         pdfShowWordCount ? `<span>📝 ${wordCount} words</span>` : '',
       ].filter(Boolean).join(' &nbsp;·&nbsp; ')
@@ -489,7 +494,7 @@ export default function NotesView() {
   const handleRenameCategory = async (oldCat: string, newCat: string) => {
     // Update all notes in the category
     const affected = noteTasks.filter(t =>
-      ((t.data?.category as string) === oldCat) || (!t.data?.category && oldCat === "Uncategorized")
+      (categoryOf(t) === oldCat) || (!categoryOf(t) && oldCat === "Uncategorized")
     )
     for (const t of affected) {
       await useKanbanStore.getState().updateTask(t.id, {
@@ -508,7 +513,7 @@ export default function NotesView() {
 
   const confirmDeleteCategory = async () => {
     if (!deletingCategory) return
-    const toDelete = noteTasks.filter(t => ((t.data?.category as string) || "Uncategorized") === deletingCategory)
+    const toDelete = noteTasks.filter(t => (categoryOf(t) || "Uncategorized") === deletingCategory)
     for (const n of toDelete) await useKanbanStore.getState().deleteTask(n.id)
     setDeletingCategory(null); setShowDeleteCategoryDialog(false)
   }
@@ -791,7 +796,7 @@ export default function NotesView() {
                   {/* ── All categories ────────────────────────────────────── */}
                   <ExplorerTree<Task>
                     items={noteTasks}
-                    groupKey={(item: Task) => (item.data?.category as string) || "Uncategorized"}
+                    groupKey={(item: Task) => categoryOf(item) || "Uncategorized"}
                     renderItem={renderNoteItem}
                     onCreate={handleCreateNote}
                     onItemSelect={(item) => { setSelectedNoteId(item.id); setViewMode(v => v === "edit" ? "edit" : "preview") }}
@@ -1257,7 +1262,7 @@ export default function NotesView() {
         required
         defaultValue={(() => {
           const note = categoryDialogNoteId ? noteTasks.find(t => t.id === categoryDialogNoteId) : null
-          return (note?.data?.category as string) || "Uncategorized"
+          return note ? (categoryOf(note) || "Uncategorized") : "Uncategorized"
         })()}
       />
 
